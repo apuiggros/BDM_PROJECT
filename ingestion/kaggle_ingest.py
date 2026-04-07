@@ -28,6 +28,7 @@ import io
 import json
 import logging
 import os
+import sys
 import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
@@ -37,6 +38,10 @@ import pandas as pd
 import requests
 from botocore.client import Config
 from dotenv import load_dotenv
+
+# ── Allow import from the same /ingestion/ package ────────────────────────────
+sys.path.insert(0, str(Path(__file__).parent))
+from philosopher_registry import TARGET_PHILOSOPHERS
 
 # ─── Configuration ────────────────────────────────────────────────────────────
 load_dotenv()
@@ -66,27 +71,37 @@ MINIO_SECRET_KEY = os.getenv("MINIO_SECRET_KEY", "password")
 MINIO_BUCKET     = os.getenv("MINIO_BUCKET", "landing-zone")
 S3_PREFIX        = "kaggle_wikidata/tables"
 
-# SPARQL query: philosophers with birth/death dates, nationality, influences
-WIKIDATA_SPARQL_QUERY = """
+# SPARQL query: target philosophers only, using a VALUES clause for filtering.
+# The labels are matched against the wikidata_label field in philosopher_registry.py.
+def build_wikidata_sparql() -> str:
+    """
+    Build a targeted SPARQL query that fetches biographical and philosophical
+    data for only the 5 target philosophers using a VALUES filter.
+    This is far more efficient than pulling all 5000 philosophers.
+    """
+    labels = " ".join(
+        f'"{p["wikidata_label"]}"@en' for p in TARGET_PHILOSOPHERS
+    )
+    return f"""
 SELECT DISTINCT
   ?philosopher ?philosopherLabel
   ?birthDate ?deathDate
   ?nationalityLabel
   ?influencedByLabel
   ?mainWorkLabel
-WHERE {
+WHERE {{
+  VALUES ?philosopherLabel {{ {labels} }}
   ?philosopher wdt:P31 wd:Q5 ;           # instance of: human
                wdt:P106 wd:Q4964182 .    # occupation: philosopher
 
-  OPTIONAL { ?philosopher wdt:P569 ?birthDate . }
-  OPTIONAL { ?philosopher wdt:P570 ?deathDate . }
-  OPTIONAL { ?philosopher wdt:P27  ?nationality . }
-  OPTIONAL { ?philosopher wdt:P737 ?influencedBy . }
-  OPTIONAL { ?philosopher wdt:P800 ?mainWork . }
+  OPTIONAL {{ ?philosopher wdt:P569 ?birthDate . }}
+  OPTIONAL {{ ?philosopher wdt:P570 ?deathDate . }}
+  OPTIONAL {{ ?philosopher wdt:P27  ?nationality . }}
+  OPTIONAL {{ ?philosopher wdt:P737 ?influencedBy . }}
+  OPTIONAL {{ ?philosopher wdt:P800 ?mainWork . }}
 
-  SERVICE wikibase:label { bd:serviceParam wikibase:language "en" . }
-}
-LIMIT 5000
+  SERVICE wikibase:label {{ bd:serviceParam wikibase:language "en" . }}
+}}
 """
 
 
@@ -138,7 +153,11 @@ def ingest_kaggle(client: boto3.client, timestamp: str) -> None:
     Kaggle credentials must be set as environment variables:
         KAGGLE_USERNAME and KAGGLE_KEY  (see .env file)
     """
-    import kaggle  # imported here so missing credentials don't crash the module
+    try:
+        import kaggle  # imported here so missing credentials don't crash the module
+    except OSError:
+        logger.warning("KAGGLE_USERNAME or KAGGLE_KEY missing in .env — skipping Kaggle ingestion.")
+        return
 
     TMP_DIR.mkdir(parents=True, exist_ok=True)
     logger.info("Downloading Kaggle dataset: %s", KAGGLE_DATASET)
@@ -205,8 +224,9 @@ def ingest_wikidata(client: boto3.client, timestamp: str) -> None:
     """
     Run the Wikidata SPARQL query and upload results as a CSV to MinIO.
     """
-    logger.info("Querying Wikidata SPARQL endpoint…")
-    rows = query_wikidata(WIKIDATA_SPARQL_QUERY)
+    sparql = build_wikidata_sparql()
+    logger.info("Querying Wikidata for: %s", [p["wikidata_label"] for p in TARGET_PHILOSOPHERS])
+    rows = query_wikidata(sparql)
     if not rows:
         logger.warning("Wikidata query returned 0 results — skipping upload.")
         return

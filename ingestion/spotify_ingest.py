@@ -100,16 +100,15 @@ def upload_audio(client: boto3.client, audio_bytes: bytes, key: str) -> None:
 
 
 # ─── Spotify Logic ────────────────────────────────────────────────────────────
-def get_spotify_client() -> spotipy.Spotify:
+def get_spotify_client() -> spotipy.Spotify | None:
     """
     Authenticate with Spotify using the Client Credentials OAuth flow.
     Credentials are read from environment variables (SPOTIFY_CLIENT_ID /
     SPOTIFY_CLIENT_SECRET) which should be set in your .env file.
     """
     if not SPOTIFY_CLIENT_ID or not SPOTIFY_CLIENT_SECRET:
-        raise EnvironmentError(
-            "SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET must be set in .env"
-        )
+        logger.warning("SPOTIFY_CLIENT_ID or SPOTIFY_CLIENT_SECRET missing in .env — skipping Spotify ingestion.")
+        return None
     auth_manager = SpotifyClientCredentials(
         client_id=SPOTIFY_CLIENT_ID,
         client_secret=SPOTIFY_CLIENT_SECRET,
@@ -172,6 +171,8 @@ def run() -> None:
     client = get_minio_client()
     ensure_bucket(client, MINIO_BUCKET)
     sp = get_spotify_client()
+    if not sp:
+        return
 
     for show_id in PHILOSOPHY_SHOW_IDS:
         logger.info("Processing show: %s", show_id)

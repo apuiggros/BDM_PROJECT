@@ -6,9 +6,8 @@ x-airflow-common: &airflow-common
   environment:
     # Core settings
     - AIRFLOW__CORE__LOAD_EXAMPLES=False
-    - AIRFLOW__CORE__EXECUTOR=SequentialExecutor
-    # SQLite is sufficient for P1 (single-node, low concurrency)
-    - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=sqlite:////opt/airflow/airflow.db
+    - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+    - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/airflow
     # MinIO credentials forwarded to task containers (shared .env baked in)
     - MINIO_ENDPOINT=minio:9000
     - MINIO_ACCESS_KEY=admin
@@ -16,6 +15,8 @@ x-airflow-common: &airflow-common
     - MINIO_BUCKET=landing-zone
     # Path to ingestion scripts inside the container
     - INGESTION_DIR=/opt/airflow/ingestion
+    # Ensure our API libraries exist in the Airflow environment
+    - _PIP_ADDITIONAL_REQUIREMENTS=spotipy pandas kaggle boto3 python-dotenv deltalake
   volumes:
     # DAGs directory
     - ./orchestration:/opt/airflow/dags
@@ -70,21 +71,17 @@ services:
     <<: *airflow-common
     container_name: airflow-webserver
     ports:
-      - "8080:8080"    # Airflow Web UI
+      - "8081:8080"    # Airflow Web UI
     command: >
       bash -c "
         airflow db migrate &&
-        airflow users create
-          --username admin
-          --password admin
-          --firstname Admin
-          --lastname User
-          --role Admin
-          --email admin@example.com &&
+        airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin --email admin@example.com &&
         airflow webserver
       "
     depends_on:
       minio:
+        condition: service_healthy
+      postgres:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
@@ -105,6 +102,21 @@ services:
     depends_on:
       airflow-webserver:
         condition: service_healthy
+      postgres:
+        condition: service_healthy
+
+  # ── Airflow Metadata DB ──────────────────────────────────────────────────────
+  postgres:
+    image: postgres:13
+    container_name: postgres
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U airflow"]
+      interval: 10s
+      retries: 5
 
 # ─── Named Volumes ────────────────────────────────────────────────────────────
 volumes:

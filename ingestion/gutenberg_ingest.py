@@ -27,12 +27,18 @@ import io
 import json
 import logging
 import os
+import sys
 from datetime import datetime, timezone
+from pathlib import Path
 
 import boto3
 import requests
 from botocore.client import Config
 from dotenv import load_dotenv
+
+# ── Allow import from the same /ingestion/ package ────────────────────────────
+sys.path.insert(0, str(Path(__file__).parent))
+from philosopher_registry import TARGET_PHILOSOPHERS
 
 # ─── Configuration ────────────────────────────────────────────────────────────
 load_dotenv()
@@ -49,24 +55,7 @@ MINIO_SECRET_KEY = os.getenv("MINIO_SECRET_KEY", "password")
 MINIO_BUCKET     = os.getenv("MINIO_BUCKET", "landing-zone")
 S3_PREFIX        = "gutenberg/raw_text"
 
-GUTENDEX_API     = "https://gutendex.com/books"
-
-# Philosopher authors to search for via Gutendex (name as it appears in catalog)
-TARGET_AUTHORS: list[str] = [
-    "Plato",
-    "Aristotle",
-    "Nietzsche, Friedrich Wilhelm",
-    "Kant, Immanuel",
-    "Descartes, René",
-    "Hume, David",
-    "Locke, John",
-    "Rousseau, Jean-Jacques",
-    "Voltaire",
-    "Schopenhauer, Arthur",
-]
-
-# Maximum books to download per author per run
-MAX_BOOKS_PER_AUTHOR: int = 3
+GUTENDEX_API = "https://gutendex.com/books"
 
 # Preferred text formats (checked in priority order, first match wins)
 TEXT_FORMATS: list[str] = [
@@ -116,16 +105,38 @@ def upload_json_metadata(client: boto3.client, data: dict | list, key: str) -> N
 
 
 # ─── Gutendex API ─────────────────────────────────────────────────────────────
-def search_author(author_name: str) -> list[dict]:
+def search_author(philo: dict) -> list[dict]:
     """
-    Search the Gutendex catalog for books by a specific author.
-    Returns a list of book metadata objects.
+    Search the Gutendex catalog using the gutenberg_search term from the
+    registry, then filter results to only books where the target philosopher
+    is an actual author (avoids books merely *about* them).
     """
-    params = {"search": author_name, "languages": "en"}
-    logger.info("Searching Gutendex for: %s", author_name)
-    response = requests.get(GUTENDEX_API, params=params, timeout=30)
-    response.raise_for_status()
-    return response.json().get("results", [])
+    search_term = philo["gutenberg_search"]
+    slug        = philo["gutenberg_author_slug"]
+    params = {"search": search_term, "languages": "en"}
+    logger.info("Searching Gutendex for: %s", search_term)
+    try:
+        response = requests.get(GUTENDEX_API, params=params, timeout=60)
+        response.raise_for_status()
+    except requests.exceptions.Timeout:
+        logger.warning("Gutendex timed out for '%s' — skipping.", search_term)
+        return []
+
+    all_results = response.json().get("results", [])
+
+    # Keep only books where this philosopher appears as an author
+    def is_authored_by(book: dict) -> bool:
+        return any(
+            slug in a.get("name", "").lower()
+            for a in book.get("authors", [])
+        )
+
+    authored = [b for b in all_results if is_authored_by(b)]
+    logger.info(
+        "  %s: %d results, %d confirmed as author",
+        search_term, len(all_results), len(authored)
+    )
+    return authored
 
 
 def resolve_text_url(book: dict) -> str | None:
@@ -159,68 +170,80 @@ def download_text(url: str) -> str | None:
         return None
 
 
+import time
+
 # ─── Main Ingestion Logic ─────────────────────────────────────────────────────
-def ingest_author(client: boto3.client, author: str, timestamp: str) -> None:
+def ingest_author(client: boto3.client, philo: dict, timestamp: str) -> None:
     """
-    For a given philosopher author:
-    1. Search Gutendex for their English public-domain works.
-    2. Download and upload each text file to MinIO (up to MAX_BOOKS_PER_AUTHOR).
-    3. Upload the catalog metadata JSON for provenance.
+    For a single philosopher entry from the registry:
+    1. Search Gutendex using the gutenberg_search term.
+    2. Upload catalog metadata JSON for provenance.
+    3. Download and upload ALL confirmed plain-text files (with safety throttling).
     """
-    books = search_author(author)
+    slug  = philo["gutenberg_author_slug"]
+    name  = philo["api_name"]
+    books = search_author(philo)
+
     if not books:
-        logger.warning("No books found for author: %s", author)
+        logger.warning("No books found for: %s", name)
         return
 
-    # Normalise author name for use in S3 keys (remove commas/spaces)
-    author_slug = author.replace(",", "").replace(" ", "_").lower()
+    # Upload catalog metadata (provenance record)
+    meta_key = f"{S3_PREFIX}/{slug}_catalog_{timestamp}.json"
+    upload_json_metadata(client, books, meta_key)
 
-    # Upload catalog metadata for this author
-    meta_key = f"{S3_PREFIX}/{author_slug}_catalog_{timestamp}.json"
-    upload_json_metadata(client, books[:MAX_BOOKS_PER_AUTHOR], meta_key)
-
-    # Download each book's plain text
+    # Download and upload plain-text files
     downloaded = 0
     for book in books:
-        if downloaded >= MAX_BOOKS_PER_AUTHOR:
-            break
-
         book_id    = book.get("id", "unknown")
         title_slug = book.get("title", "untitled")[:60].replace(" ", "_").replace("/", "-")
         text_url   = resolve_text_url(book)
 
         if not text_url:
-            logger.warning("No plain-text format found for book %s (%s) — skipping.", book_id, title_slug)
+            logger.warning("No plain-text URL for book %s (%s) — skipping.", book_id, title_slug)
             continue
+            
+        key = f"{S3_PREFIX}/{slug}_{book_id}_{title_slug}.txt"
+
+        # Idempotency check: Skip if already exists
+        try:
+            client.head_object(Bucket=MINIO_BUCKET, Key=key)
+            logger.info("  ↳ Already exists in MinIO: %s (Skipping download)", key)
+            continue
+        except Exception:
+            pass  # Object does not exist, safe to proceed
 
         logger.info("Downloading: [%s] %s", book_id, book.get("title", "?"))
         text = download_text(text_url)
         if not text:
             continue
 
-        key = f"{S3_PREFIX}/{author_slug}_{book_id}_{title_slug}_{timestamp}.txt"
         upload_text(client, text, key)
         downloaded += 1
 
-    logger.info("Author '%s': %d book(s) ingested.", author, downloaded)
+        # SAFETY: Project Gutenberg aggressively rate-limits rapid scraping.
+        time.sleep(1.5)
+
+    logger.info("✓ %s: %d book(s) ingested.", name, downloaded)
 
 
 # ─── Main Entry Point ─────────────────────────────────────────────────────────
 def run() -> None:
     """
-    Iterate over the TARGET_AUTHORS list and ingest texts from Project Gutenberg
-    for each philosopher via the Gutendex API.
+    Iterate over TARGET_PHILOSOPHERS from the registry and ingest
+    plain-text books from Project Gutenberg for each.
     """
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     client = get_minio_client()
     ensure_bucket(client, MINIO_BUCKET)
 
-    for author in TARGET_AUTHORS:
+    for philo in TARGET_PHILOSOPHERS:
         try:
-            ingest_author(client, author, timestamp)
+            ingest_author(client, philo, timestamp)
         except Exception as exc:
-            # Catch broad exceptions so one failed author doesn't abort the run
-            logger.error("Ingestion failed for author '%s': %s", author, exc, exc_info=True)
+            logger.error(
+                "Ingestion failed for '%s': %s", philo["api_name"], exc, exc_info=True
+            )
 
     logger.info("✓ Project Gutenberg ingestion complete.")
 

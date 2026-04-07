@@ -8,23 +8,32 @@ Pipeline Stage: P1 — Cold-Path Batch Ingestion
 
 Description
 -----------
-Connects to the public Philosophers REST API, fetches the full list of
-philosophers and their associated concepts/schools, then pushes each
-paginated response as a timestamped JSON blob into the MinIO object store.
+Connects to the public Philosophers REST API and fetches the full list of 114
+philosophers (single flat list — no pagination). Records are filtered to only
+the 5 target philosophers defined in philosopher_registry.py, and stored as
+a timestamped JSON blob in MinIO.
 
-No data transformation takes place here; raw JSON is stored exactly as
-received from the API (data-at-rest integrity preserved for the Trusted Zone).
+Also stores the SEP/IEP academic article URLs for each target so a future
+scraping step can enrich the dataset without re-hitting this API.
+
+No data transformation occurs here; raw JSON is preserved as-is.
 """
 
 import json
 import logging
 import os
+import sys
 from datetime import datetime, timezone
+from pathlib import Path
 
 import boto3
 import requests
 from botocore.client import Config
 from dotenv import load_dotenv
+
+# ── Allow import from the same /ingestion/ package ────────────────────────────
+sys.path.insert(0, str(Path(__file__).parent))
+from philosopher_registry import TARGET_PHILOSOPHERS, ALL_API_NAMES
 
 # ─── Configuration ────────────────────────────────────────────────────────────
 load_dotenv()
@@ -74,17 +83,9 @@ def ensure_bucket(client: boto3.client, bucket: str) -> None:
         logger.info("Bucket already exists: %s", bucket)
 
 
-# ─── Upload Helper ────────────────────────────────────────────────────────────
+# ─── Upload Helpers ───────────────────────────────────────────────────────────
 def upload_to_minio(client: boto3.client, data: dict | list, object_key: str) -> None:
-    """
-    Serialize `data` to JSON and upload it to MinIO under `object_key`.
-
-    Parameters
-    ----------
-    client     : Boto3 S3 client pointed at MinIO.
-    data       : Python dict or list to serialize.
-    object_key : Full S3 key (prefix + filename) inside the bucket.
-    """
+    """Serialize `data` to JSON and upload it to MinIO."""
     payload = json.dumps(data, ensure_ascii=False, indent=2).encode("utf-8")
     client.put_object(
         Bucket=MINIO_BUCKET,
@@ -94,51 +95,53 @@ def upload_to_minio(client: boto3.client, data: dict | list, object_key: str) ->
     )
     logger.info("Uploaded %d bytes → s3://%s/%s", len(payload), MINIO_BUCKET, object_key)
 
+def upload_binary_to_minio(client: boto3.client, data: bytes, object_key: str, content_type: str) -> None:
+    """Upload raw bytes (e.g. images) to MinIO."""
+    client.put_object(
+        Bucket=MINIO_BUCKET,
+        Key=object_key,
+        Body=data,
+        ContentType=content_type,
+    )
+    logger.info("Uploaded image (%d bytes) → s3://%s/%s", len(data), MINIO_BUCKET, object_key)
+
 
 # ─── Ingestion Logic ──────────────────────────────────────────────────────────
-def fetch_philosophers() -> list[dict]:
+def fetch_target_philosophers() -> list[dict]:
     """
-    Retrieve the complete list of philosophers from the API.
+    Fetch all 114 records from the API (single flat list, no pagination —
+    confirmed by playground exploration) and filter to only the 5 targets
+    defined in philosopher_registry.py.
 
-    The Philosophers API is paginated; this function follows the `next` link
-    until all pages have been consumed and returns the aggregated records.
+    Also attaches a 'academic_links' sub-dict with the SEP and IEP URLs
+    for future enrichment steps.
     """
-    records: list[dict] = []
-    url = f"{API_BASE_URL}/philosophers"
-
-    while url:
-        logger.info("Fetching: %s", url)
-        response = requests.get(url, timeout=30)
-        response.raise_for_status()
-        body = response.json()
-
-        # The API may return a list directly or wrap it in a results key
-        page_data = body if isinstance(body, list) else body.get("results", body)
-        if isinstance(page_data, list):
-            records.extend(page_data)
-        else:
-            records.append(page_data)
-
-        # Follow pagination if present (adjust key to match actual API response)
-        url = body.get("next") if isinstance(body, dict) else None
-
-    logger.info("Total philosophers fetched: %d", len(records))
-    return records
-
-
-def fetch_concepts() -> list[dict]:
-    """
-    Retrieve philosophical concepts/schools from the API (if endpoint exists).
-    """
-    url = f"{API_BASE_URL}/concepts"
-    logger.info("Fetching concepts from: %s", url)
-    response = requests.get(url, timeout=30)
-    if response.status_code == 404:
-        logger.warning("Concepts endpoint not found — skipping.")
-        return []
+    logger.info("Fetching full philosopher list from API…")
+    response = requests.get(f"{API_BASE_URL}/philosophers", timeout=30)
     response.raise_for_status()
-    body = response.json()
-    return body if isinstance(body, list) else body.get("results", [])
+    all_records: list[dict] = response.json()   # flat list, no wrapper
+    logger.info("Total records from API: %d", len(all_records))
+
+    # Build lookup by lowercase name for tolerant matching
+    name_map = {r["name"].lower(): r for r in all_records}
+
+    filtered: list[dict] = []
+    for target_name in ALL_API_NAMES:
+        record = name_map.get(target_name.lower())
+        if record:
+            # Attach a convenience summary of academic URLs
+            record["_academic_links"] = {
+                "stanford_sep": record.get("speLink"),
+                "internet_iep": record.get("iepLink"),
+                "wikipedia":    f"https://en.wikipedia.org/wiki/{record.get('wikiTitle','').replace(' ', '_')}",
+            }
+            filtered.append(record)
+            logger.info("  ✓ Found: %s (school: %s)", record["name"], record.get("school", "?"))
+        else:
+            logger.warning("  ✗ NOT FOUND in API: '%s' — check registry spelling", target_name)
+
+    logger.info("Target philosophers matched: %d/%d", len(filtered), len(ALL_API_NAMES))
+    return filtered
 
 
 # ─── Main Entry Point ─────────────────────────────────────────────────────────
@@ -146,31 +149,61 @@ def run() -> None:
     """
     Orchestrate the full ingestion cycle:
     1. Connect to MinIO and ensure the bucket exists.
-    2. Fetch data from all Philosophers API endpoints.
-    3. Push each dataset as a timestamped JSON file to the landing zone.
+    2. Fetch all API records and filter to the 5 target philosophers.
+    3. Store filtered records as a timestamped JSON file.
+    4. Download and store all associated images (thumbnails, illustrations, face crops).
     """
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     client = get_minio_client()
     ensure_bucket(client, MINIO_BUCKET)
 
-    # --- Philosophers ---
-    philosophers = fetch_philosophers()
+    philosophers = fetch_target_philosophers()
+    if not philosophers:
+        logger.error("No target philosophers found — aborting upload.")
+        return
+
+    # 1. Upload the core metadata JSON
     upload_to_minio(
         client,
         philosophers,
-        f"{S3_PREFIX}/philosophers_{timestamp}.json",
+        f"{S3_PREFIX}/philosophers_catalog.json",
     )
 
-    # --- Concepts / Schools ---
-    concepts = fetch_concepts()
-    if concepts:
-        upload_to_minio(
-            client,
-            concepts,
-            f"{S3_PREFIX}/concepts_{timestamp}.json",
-        )
+    # 2. Extract and download all images for these specific philosophers
+    logger.info("Fetching images for target philosophers...")
+    BASE_DOMAIN = "https://philosophersapi.com"
+    
+    for philo in philosophers:
+        slug = philo["name"].lower().replace(" ", "_")
+        images_dict = philo.get("images") or {}
+        
+        for category, urls in images_dict.items():
+            for image_key, url_path in urls.items():
+                if not url_path:
+                    continue
+                full_url = f"{BASE_DOMAIN}{url_path}"
+                try:
+                    # Determine extension (mostly .jpg or .png)
+                    ext = url_path.split(".")[-1].lower() if "." in url_path else "jpg"
+                    content_type = f"image/{ext}" if ext in ["png", "jpeg", "jpg"] else "application/octet-stream"
+                    
+                    obj_key = f"philosophers_api/raw_images/{slug}/{category}/{image_key}.{ext}"
+                    
+                    # Idempotency check: Skip if already exists
+                    try:
+                        client.head_object(Bucket=MINIO_BUCKET, Key=obj_key)
+                        continue
+                    except Exception:
+                        pass  # Object does not exist, safe to proceed
+                        
+                    resp = requests.get(full_url, timeout=15)
+                    resp.raise_for_status()
+                    
+                    upload_binary_to_minio(client, resp.content, obj_key, content_type)
+                except Exception as e:
+                    logger.warning("Failed to download image %s: %s", full_url, e)
 
-    logger.info("✓ Philosophers API ingestion complete.")
+    logger.info("✓ Philosophers API metadata and image ingestion complete.")
 
 
 if __name__ == "__main__":
