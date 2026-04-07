@@ -1,0 +1,112 @@
+version: '3.8'
+
+# ─── Shared Airflow configuration block (YAML anchor) ────────────────────────
+x-airflow-common: &airflow-common
+  image: apache/airflow:2.9.0
+  environment:
+    # Core settings
+    - AIRFLOW__CORE__LOAD_EXAMPLES=False
+    - AIRFLOW__CORE__EXECUTOR=SequentialExecutor
+    # SQLite is sufficient for P1 (single-node, low concurrency)
+    - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=sqlite:////opt/airflow/airflow.db
+    # MinIO credentials forwarded to task containers (shared .env baked in)
+    - MINIO_ENDPOINT=minio:9000
+    - MINIO_ACCESS_KEY=admin
+    - MINIO_SECRET_KEY=password
+    - MINIO_BUCKET=landing-zone
+    # Path to ingestion scripts inside the container
+    - INGESTION_DIR=/opt/airflow/ingestion
+  volumes:
+    # DAGs directory
+    - ./orchestration:/opt/airflow/dags
+    # Ingestion scripts — available to tasks via subprocess
+    - ./ingestion:/opt/airflow/ingestion
+    # Persistent Airflow logs
+    - airflow_logs:/opt/airflow/logs
+  env_file:
+    - .env
+
+# ─── Services ─────────────────────────────────────────────────────────────────
+services:
+
+  # ── MinIO: S3-compatible local object store (Landing Zone) ──────────────────
+  minio:
+    image: minio/minio:latest
+    container_name: minio
+    ports:
+      - "9000:9000"    # S3 API
+      - "9001:9001"    # MinIO Web Console
+    environment:
+      MINIO_ROOT_USER: admin
+      MINIO_ROOT_PASSWORD: password
+    volumes:
+      # Landing zone folders on the host are served as MinIO data
+      - ./landing_zone:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+
+  # ── MinIO bucket initialiser (runs once on startup) ─────────────────────────
+  minio-init:
+    image: minio/mc:latest
+    container_name: minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+        /usr/bin/mc alias set local http://minio:9000 admin password &&
+        /usr/bin/mc mb --ignore-existing local/landing-zone &&
+        echo 'Bucket landing-zone is ready.' &&
+        exit 0
+      "
+
+  # ── Airflow Webserver ────────────────────────────────────────────────────────
+  airflow-webserver:
+    <<: *airflow-common
+    container_name: airflow-webserver
+    ports:
+      - "8080:8080"    # Airflow Web UI
+    command: >
+      bash -c "
+        airflow db migrate &&
+        airflow users create
+          --username admin
+          --password admin
+          --firstname Admin
+          --lastname User
+          --role Admin
+          --email admin@example.com &&
+        airflow webserver
+      "
+    depends_on:
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # ── Airflow Scheduler ────────────────────────────────────────────────────────
+  airflow-scheduler:
+    <<: *airflow-common
+    container_name: airflow-scheduler
+    command: >
+      bash -c "
+        airflow db migrate &&
+        airflow scheduler
+      "
+    depends_on:
+      airflow-webserver:
+        condition: service_healthy
+
+# ─── Named Volumes ────────────────────────────────────────────────────────────
+volumes:
+  airflow_logs:
+    driver: local

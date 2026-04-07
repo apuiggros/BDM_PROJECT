@@ -1,0 +1,47 @@
+# ─── Virtual Environments ────────────────────────────────────────────────────
+venv/
+.venv/
+env/
+ENV/
+
+# ─── Environment / Secrets ────────────────────────────────────────────────────
+.env
+*.env
+
+# ─── Python Cache ─────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+
+# ─── Raw Data Files (landing zone contents are not tracked) ───────────────────
+*.csv
+*.json
+*.mp3
+*.wav
+*.txt
+*.parquet
+
+# ─── Jupyter / IPython ────────────────────────────────────────────────────────
+.ipynb_checkpoints/
+*.ipynb
+
+# ─── OS / Editor Artifacts ────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# ─── Airflow / MinIO Runtime Artifacts ────────────────────────────────────────
+logs/
+airflow.db
+airflow.cfg
+airflow_settings.yaml
+
+# ─── Build / Distribution ─────────────────────────────────────────────────────
+dist/
+build/
+*.egg-info/
