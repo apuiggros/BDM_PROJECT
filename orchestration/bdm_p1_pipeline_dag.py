@@ -13,8 +13,6 @@ DAG Graph
   check_minio_health
         │
         ├──> ingest_philosophers_api
-        ├──> ingest_spotify
-        ├──> ingest_kaggle_wikidata
         └──> ingest_gutenberg
                 │
                 └──> pipeline_complete  (dummy summary task)
@@ -101,24 +99,24 @@ def run_philosophers() -> None:
     _run_ingestion_script("philosophers_ingest.py")
 
 
-def run_spotify() -> None:
-    _run_ingestion_script("spotify_ingest.py")
-
-
-def run_kaggle_wikidata() -> None:
-    _run_ingestion_script("kaggle_ingest.py")
-
-
 def run_gutenberg() -> None:
     _run_ingestion_script("gutenberg_ingest.py")
+
+
+def run_youtube() -> None:
+    _run_ingestion_script("youtube_transcript_ingest.py")
+
+
+def run_news() -> None:
+    _run_ingestion_script("news_ingest.py")
 
 
 # ─── DAG Definition ───────────────────────────────────────────────────────────
 with DAG(
     dag_id="bdm_p1_cold_path_ingestion",
     description=(
-        "BDM P1 — Daily cold-path batch ingestion from Philosophers API, "
-        "Spotify, Kaggle/Wikidata, and Project Gutenberg into the MinIO landing zone."
+        "BDM P1 — Daily cold-path batch ingestion from Philosophers API "
+        "and Project Gutenberg into the MinIO landing zone."
     ),
     default_args=DEFAULT_ARGS,
     schedule_interval="@daily",           # Run once per day at midnight UTC
@@ -145,22 +143,22 @@ with DAG(
         doc_md="Fetches philosopher records & concepts from philosophersapi.com and stores JSON in MinIO.",
     )
 
-    ingest_spotify = PythonOperator(
-        task_id="ingest_spotify",
-        python_callable=run_spotify,
-        doc_md="Fetches Spotify podcast episode metadata (JSON) and 30-sec audio previews (MP3) into MinIO.",
-    )
-
-    ingest_kaggle = PythonOperator(
-        task_id="ingest_kaggle_wikidata",
-        python_callable=run_kaggle_wikidata,
-        doc_md="Downloads philosophy-quotes CSV from Kaggle and philosopher timeline CSV from Wikidata SPARQL.",
-    )
-
     ingest_gutenberg = PythonOperator(
         task_id="ingest_gutenberg",
         python_callable=run_gutenberg,
         doc_md="Downloads canonical philosophy texts in plain-text format from Project Gutenberg via Gutendex API.",
+    )
+
+    ingest_youtube = PythonOperator(
+        task_id="ingest_youtube_transcripts",
+        python_callable=run_youtube,
+        doc_md="Fetches closed captions/transcripts from YouTube videos using youtube-transcript-api.",
+    )
+
+    ingest_news = PythonOperator(
+        task_id="ingest_news_api",
+        python_callable=run_news,
+        doc_md="Fetches daily news snapshots based on specific philosophical/technology queries via GNews API.",
     )
 
     # ── Summary task (downstream gate) ───────────────────────────────────────
@@ -171,5 +169,5 @@ with DAG(
 
     # ── Task Dependencies ─────────────────────────────────────────────────────
     # health_check → [parallel ingestion tasks] → pipeline_done
-    health_check >> [ingest_philosophers, ingest_spotify, ingest_kaggle, ingest_gutenberg]
-    [ingest_philosophers, ingest_spotify, ingest_kaggle, ingest_gutenberg] >> pipeline_done
+    health_check >> [ingest_philosophers, ingest_gutenberg, ingest_youtube, ingest_news]
+    [ingest_philosophers, ingest_gutenberg, ingest_youtube, ingest_news] >> pipeline_done

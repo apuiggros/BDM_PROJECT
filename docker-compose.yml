@@ -16,7 +16,7 @@ x-airflow-common: &airflow-common
     # Path to ingestion scripts inside the container
     - INGESTION_DIR=/opt/airflow/ingestion
     # Ensure our API libraries exist in the Airflow environment
-    - _PIP_ADDITIONAL_REQUIREMENTS=spotipy pandas kaggle boto3 python-dotenv deltalake
+    - _PIP_ADDITIONAL_REQUIREMENTS=pandas boto3 python-dotenv deltalake
   volumes:
     # DAGs directory
     - ./orchestration:/opt/airflow/dags
@@ -117,8 +117,12 @@ services:
       test: ["CMD-SHELL", "pg_isready -U airflow"]
       interval: 10s
       retries: 5
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
 
 # ─── Named Volumes ────────────────────────────────────────────────────────────
 volumes:
   airflow_logs:
+    driver: local
+  postgres_data:
     driver: local

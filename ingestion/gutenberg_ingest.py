@@ -189,7 +189,7 @@ def ingest_author(client: boto3.client, philo: dict, timestamp: str) -> None:
         return
 
     # Upload catalog metadata (provenance record)
-    meta_key = f"{S3_PREFIX}/{slug}_catalog_{timestamp}.json"
+    meta_key = f"{S3_PREFIX}/{slug}_catalog.json"
     upload_json_metadata(client, books, meta_key)
 
     # Download and upload plain-text files
