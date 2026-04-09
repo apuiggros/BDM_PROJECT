@@ -1,0 +1,4 @@
+Traceback (most recent call last):
+  File "/home/apuiggros/courses/BDM/P1/ingestion/stream_producer.py", line 17, in <module>
+    KAFKA_BROKER = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092")
+NameError: name 'os' is not defined

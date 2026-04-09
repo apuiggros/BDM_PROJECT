@@ -33,7 +33,10 @@ from dotenv import load_dotenv
 
 # ── Allow import from the same /ingestion/ package ────────────────────────────
 sys.path.insert(0, str(Path(__file__).parent))
-from philosopher_registry import TARGET_PHILOSOPHERS, ALL_API_NAMES
+# Import from the new generic registry; filter to philosophy domain only
+# (this script hits the Philosophers API which is specific to philosophers)
+from character_registry import figures_by_domain, ALL_API_NAMES
+TARGET_PHILOSOPHERS = figures_by_domain("philosophy")
 
 # ─── Configuration ────────────────────────────────────────────────────────────
 load_dotenv()
@@ -109,27 +112,25 @@ def upload_binary_to_minio(client: boto3.client, data: bytes, object_key: str, c
 # ─── Ingestion Logic ──────────────────────────────────────────────────────────
 def fetch_target_philosophers() -> list[dict]:
     """
-    Fetch all 114 records from the API (single flat list, no pagination —
-    confirmed by playground exploration) and filter to only the 5 targets
-    defined in philosopher_registry.py.
-
-    Also attaches a 'academic_links' sub-dict with the SEP and IEP URLs
-    for future enrichment steps.
+    Fetch all 114 records from the API and filter to only the target figures
+    belonging to the 'philosophy' domain.
     """
     logger.info("Fetching full philosopher list from API…")
     response = requests.get(f"{API_BASE_URL}/philosophers", timeout=30)
     response.raise_for_status()
-    all_records: list[dict] = response.json()   # flat list, no wrapper
+    all_records: list[dict] = response.json()
     logger.info("Total records from API: %d", len(all_records))
 
-    # Build lookup by lowercase name for tolerant matching
+    # Build lookup by lowercase name
     name_map = {r["name"].lower(): r for r in all_records}
 
     filtered: list[dict] = []
-    for target_name in ALL_API_NAMES:
+    for philo in TARGET_PHILOSOPHERS:
+        target_name = philo["api_name"]
         record = name_map.get(target_name.lower())
         if record:
-            # Attach a convenience summary of academic URLs
+            # Attach registry metadata for path building
+            record["_registry"] = philo
             record["_academic_links"] = {
                 "stanford_sep": record.get("speLink"),
                 "internet_iep": record.get("iepLink"),
@@ -140,7 +141,7 @@ def fetch_target_philosophers() -> list[dict]:
         else:
             logger.warning("  ✗ NOT FOUND in API: '%s' — check registry spelling", target_name)
 
-    logger.info("Target philosophers matched: %d/%d", len(filtered), len(ALL_API_NAMES))
+    logger.info("Target philosophers matched: %d/%d", len(filtered), len(TARGET_PHILOSOPHERS))
     return filtered
 
 
@@ -163,10 +164,11 @@ def run() -> None:
         return
 
     # 1. Upload the core metadata JSON
+    # metadata is stored per-domain for consistency
     upload_to_minio(
         client,
         philosophers,
-        f"{S3_PREFIX}/philosophers_catalog.json",
+        f"{S3_PREFIX}/philosophy/philosophers_catalog.json",
     )
 
     # 2. Extract and download all images for these specific philosophers
@@ -187,7 +189,9 @@ def run() -> None:
                     ext = url_path.split(".")[-1].lower() if "." in url_path else "jpg"
                     content_type = f"image/{ext}" if ext in ["png", "jpeg", "jpg"] else "application/octet-stream"
                     
-                    obj_key = f"philosophers_api/raw_images/{slug}/{category}/{image_key}.{ext}"
+                    domain  = philo["_registry"]["domain"]
+                    slug    = philo["_registry"]["gutenberg_author_slug"]
+                    obj_key = f"philosophers_api/raw_images/{domain}/{slug}/{category}/{image_key}.{ext}"
                     
                     # Idempotency check: Skip if already exists
                     try:

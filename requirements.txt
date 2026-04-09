@@ -1,7 +1,8 @@
 # ─── HTTP / API Clients ───────────────────────────────────────────────────────
 requests>=2.31.0          # General-purpose HTTP client (Philosophers API, Gutenberg)
-youtube-transcript-api>=0.6.2 # Fetches closed captions/transcripts from YouTube
+
 # ─── Data Manipulation ────────────────────────────────────────────────────────
+pandas>=2.0.0             # Robust data analysis and manipulation
 # ─── Object Store / Cloud ─────────────────────────────────────────────────────
 boto3>=1.34.0             # AWS SDK for Python — used to talk to MinIO (S3-compatible)
 
@@ -13,3 +14,7 @@ apache-airflow>=2.9.0     # Workflow orchestration (DAG scheduling)
 
 # ─── Delta Lake (future-proof for Trusted Zone) ───────────────────────────────
 deltalake>=0.17.0         # Python bindings for delta-rs (Delta Lake format support)
+pyarrow>=15.0.0           # Underpinning for Delta/Parquet storage
+
+# ─── Streaming / Messaging ────────────────────────────────────────────────────
+kafka-python-ng>=2.2.0    # Kafka client (Producer/Consumer)

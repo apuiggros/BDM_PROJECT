@@ -103,27 +103,34 @@ def run_gutenberg() -> None:
     _run_ingestion_script("gutenberg_ingest.py")
 
 
-def run_youtube() -> None:
-    _run_ingestion_script("youtube_transcript_ingest.py")
-
+def run_podcasts() -> None:
+    _run_ingestion_script("podcast_audio_ingest.py")
 
 def run_news() -> None:
     _run_ingestion_script("news_ingest.py")
+
+
+def run_wikipedia() -> None:
+    _run_ingestion_script("wikipedia_ingest.py")
+
+
+def run_delta_conversion() -> None:
+    _run_ingestion_script("metadata_to_delta.py")
 
 
 # ─── DAG Definition ───────────────────────────────────────────────────────────
 with DAG(
     dag_id="bdm_p1_cold_path_ingestion",
     description=(
-        "BDM P1 — Daily cold-path batch ingestion from Philosophers API "
-        "and Project Gutenberg into the MinIO landing zone."
+        "BDM P1 — Daily cold-path batch ingestion and Delta Lake Lakehouse "
+        "transformation into the MinIO landing zone."
     ),
     default_args=DEFAULT_ARGS,
     schedule_interval="@daily",           # Run once per day at midnight UTC
     start_date=days_ago(1),
     catchup=False,                        # Do not backfill historical runs
     max_active_runs=1,                    # Prevent overlapping executions
-    tags=["bdm", "p1", "ingestion", "cold-path", "landing-zone"],
+    tags=["bdm", "p1", "ingestion", "cold-path", "delta-lake", "lakehouse"],
 ) as dag:
 
     # ── Health check (upstream gate) ──────────────────────────────────────────
@@ -146,13 +153,13 @@ with DAG(
     ingest_gutenberg = PythonOperator(
         task_id="ingest_gutenberg",
         python_callable=run_gutenberg,
-        doc_md="Downloads canonical philosophy texts in plain-text format from Project Gutenberg via Gutendex API.",
+        doc_md="Downloads canonical historical texts in plain-text format from Project Gutenberg via Gutendex API.",
     )
 
-    ingest_youtube = PythonOperator(
-        task_id="ingest_youtube_transcripts",
-        python_callable=run_youtube,
-        doc_md="Fetches closed captions/transcripts from YouTube videos using youtube-transcript-api.",
+    ingest_podcasts = PythonOperator(
+        task_id="ingest_podcast_audio",
+        python_callable=run_podcasts,
+        doc_md="Discovers and downloads high-quality podcast audio related to academic/historical topics via iTunes RSS feeds.",
     )
 
     ingest_news = PythonOperator(
@@ -161,13 +168,26 @@ with DAG(
         doc_md="Fetches daily news snapshots based on specific philosophical/technology queries via GNews API.",
     )
 
+    ingest_wikipedia = PythonOperator(
+        task_id="ingest_wikipedia_biographies",
+        python_callable=run_wikipedia,
+        doc_md="Fetches structured biography summaries from the Wikipedia REST API for all target figures.",
+    )
+
+    # ── Delta Lake Transformation (Runs after batch sources are captured) ────
+    ingest_delta_lake = PythonOperator(
+        task_id="convert_raw_to_delta",
+        python_callable=run_delta_conversion,
+        doc_md="Transforms raw JSON metadata catalogs into structured Delta Tables for the Data Lakehouse layer.",
+    )
+
     # ── Summary task (downstream gate) ───────────────────────────────────────
     pipeline_done = EmptyOperator(
         task_id="pipeline_complete",
-        doc_md="All ingestion tasks have finished successfully. Landing zone is updated.",
+        doc_md="All ingestion and Delta Lake conversions have finished successfully.",
     )
 
     # ── Task Dependencies ─────────────────────────────────────────────────────
-    # health_check → [parallel ingestion tasks] → pipeline_done
-    health_check >> [ingest_philosophers, ingest_gutenberg, ingest_youtube, ingest_news]
-    [ingest_philosophers, ingest_gutenberg, ingest_youtube, ingest_news] >> pipeline_done
+    # health_check → [parallel ingestion tasks] → delta_conversion → pipeline_done
+    health_check >> [ingest_philosophers, ingest_gutenberg, ingest_podcasts, ingest_news, ingest_wikipedia]
+    [ingest_philosophers, ingest_gutenberg, ingest_podcasts, ingest_news, ingest_wikipedia] >> ingest_delta_lake >> pipeline_done

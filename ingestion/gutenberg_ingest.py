@@ -38,7 +38,8 @@ from dotenv import load_dotenv
 
 # ── Allow import from the same /ingestion/ package ────────────────────────────
 sys.path.insert(0, str(Path(__file__).parent))
-from philosopher_registry import TARGET_PHILOSOPHERS
+# Import ALL figures: Gutenberg works for any historical author
+from character_registry import TARGET_FIGURES
 
 # ─── Configuration ────────────────────────────────────────────────────────────
 load_dotenv()
@@ -173,23 +174,25 @@ def download_text(url: str) -> str | None:
 import time
 
 # ─── Main Ingestion Logic ─────────────────────────────────────────────────────
-def ingest_author(client: boto3.client, philo: dict, timestamp: str) -> None:
+def ingest_author(client: boto3.client, figure: dict, timestamp: str) -> None:
     """
-    For a single philosopher entry from the registry:
+    For a single figure entry from the registry:
     1. Search Gutendex using the gutenberg_search term.
     2. Upload catalog metadata JSON for provenance.
     3. Download and upload ALL confirmed plain-text files (with safety throttling).
+    Paths are organized by domain: gutenberg/raw_text/{domain}/
     """
-    slug  = philo["gutenberg_author_slug"]
-    name  = philo["api_name"]
-    books = search_author(philo)
+    slug   = figure["gutenberg_author_slug"]
+    name   = figure["api_name"]
+    domain = figure["domain"]
+    books  = search_author(figure)
 
     if not books:
         logger.warning("No books found for: %s", name)
         return
 
-    # Upload catalog metadata (provenance record)
-    meta_key = f"{S3_PREFIX}/{slug}_catalog.json"
+    # Upload catalog metadata (provenance record), organized by domain
+    meta_key = f"{S3_PREFIX}/{domain}/{slug}_catalog.json"
     upload_json_metadata(client, books, meta_key)
 
     # Download and upload plain-text files
@@ -203,7 +206,7 @@ def ingest_author(client: boto3.client, philo: dict, timestamp: str) -> None:
             logger.warning("No plain-text URL for book %s (%s) — skipping.", book_id, title_slug)
             continue
             
-        key = f"{S3_PREFIX}/{slug}_{book_id}_{title_slug}.txt"
+        key = f"{S3_PREFIX}/{domain}/{slug}_{book_id}_{title_slug}.txt"
 
         # Idempotency check: Skip if already exists
         try:
@@ -224,25 +227,25 @@ def ingest_author(client: boto3.client, philo: dict, timestamp: str) -> None:
         # SAFETY: Project Gutenberg aggressively rate-limits rapid scraping.
         time.sleep(1.5)
 
-    logger.info("✓ %s: %d book(s) ingested.", name, downloaded)
+    logger.info("✓ [%s] %s: %d book(s) ingested.", domain, name, downloaded)
 
 
 # ─── Main Entry Point ─────────────────────────────────────────────────────────
 def run() -> None:
     """
-    Iterate over TARGET_PHILOSOPHERS from the registry and ingest
-    plain-text books from Project Gutenberg for each.
+    Iterate over ALL figures in TARGET_FIGURES from character_registry and ingest
+    plain-text books from Project Gutenberg for each, organized by domain.
     """
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     client = get_minio_client()
     ensure_bucket(client, MINIO_BUCKET)
 
-    for philo in TARGET_PHILOSOPHERS:
+    for figure in TARGET_FIGURES:
         try:
-            ingest_author(client, philo, timestamp)
+            ingest_author(client, figure, timestamp)
         except Exception as exc:
             logger.error(
-                "Ingestion failed for '%s': %s", philo["api_name"], exc, exc_info=True
+                "Ingestion failed for '%s': %s", figure["api_name"], exc, exc_info=True
             )
 
     logger.info("✓ Project Gutenberg ingestion complete.")

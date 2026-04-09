@@ -28,9 +28,9 @@ The challenge is that such an AI needs to answer a deceptively complex question:
 
 | Pillar | What the AI Learns | Where We Get It |
 |---|---|---|
-| **Core Biographical Facts** | Names, schools of thought, dates, concepts, portraits | Philosophers REST API |
+| **Core Biographical Facts** | Names, schools of thought, dates, concepts, portraits | Philosophers REST API & Wikipedia |
 | **Authoritative Writings** | The actual vocabulary, reasoning style, and syntax of the philosopher | Project Gutenberg (Public Domain books) |
-| **Conversational Dynamics** | How an interview or debate flows — tone, pacing, turn-taking | YouTube Transcript API |
+| **Conversational Dynamics** | How an interview or debate flows — tone, pacing, turn-taking | Podcast Audio (iTunes RSS) |
 | **Current Events Awareness** | Top trending daily news so the historical figure can "react" to the modern world | GNews API (Top Headlines) |
 
 This P1 deliverable focuses on **Phase 1**: Building and automating a fully containerized, self-healing Bronze Layer pipeline to **extract and store all this raw data at scale**, creating the foundation from which the future Trusted Zone (data cleansing) and Exploitation Zone (AI model training) can be built.
@@ -39,25 +39,25 @@ This P1 deliverable focuses on **Phase 1**: Building and automating a fully cont
 
 ## 🏗️ Architecture Overview
 
-The pipeline follows a **Registry-Driven, Micro-Ingestion architecture** organized around a central `philosopher_registry.py` — a single source of truth for all target entities. Every ingestion script reads from this registry, ensuring that adding a new philosopher to the pipeline only requires editing one file.
+The pipeline follows a **Registry-Driven, Micro-Ingestion architecture** organized around a central `character_registry.py` — a single source of truth for all target entities. Every ingestion script reads from this registry, ensuring that adding a new historical figure to the pipeline only requires editing one file.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                         DATA SOURCES (External)                             │
 │                                                                             │
 │  ┌──────────────────┐   ┌──────────────────┐   ┌──────────────────┐        │
-│  │ philosophersapi  │   │  gutendex.com    │   │  YouTube Data    │        │
-│  │ .com REST API    │   │  (Gutenberg API) │   │  API v3 +        │        │
-│  │                  │   │                  │   │  Transcript API  │        │
-│  │ • 114 records    │   │ • Public domain  │   │                  │        │
-│  │ • JSON metadata  │   │ • .txt books     │   │ • CC Search      │        │
-│  │ • Images (JPEG)  │   │ • Author catalog │   │ • JSON Transcripts│       │
+│  │ philosophersapi  │   │  gutendex.com    │   │  iTunes API      │        │
+│  │ .com REST API    │   │  (Gutenberg API) │   │  Podcast RSS     │        │
+│  │                  │   │                  │   │                  │        │
+│  │ • 114 records    │   │ • Public domain  │   │ • Global Topics  │        │
+│  │ • JSON metadata  │   │ • .txt books     │   │ • .mp3 Audio     │        │
+│  │ • Images (JPEG)  │   │ • Author catalog │   │ • JSON Metadata  │        │
 │  └────────┬─────────┘   └────────┬─────────┘   └────────┬─────────┘        │
 │           │                      │                      │                   │
-│           │             ┌────────┴──────┐               │                   │
-│           │             │  gnews.io     │               │                   │
-│           │             │  Top Headlines│               │                   │
-│           │             └────────┬──────┘               │                   │
+│  ┌────────▼─────────┐   ┌────────┴──────┐      ┌────────▼─────────┐         │
+│  │ Wikipedia API    │   │  gnews.io     │      │ pipeline_complete│         │
+│  │ Biography Sums   │   │  Top Headlines│      │ (dummy summary)  │         │
+│  └────────┬─────────┘   └────────┬──────┘      └────────▲─────────┘         │
 └───────────┼─────────────────────┼──────────────────────┼───────────────────┘
             │                     │                      │
 ┌───────────▼─────────────────────▼──────────────────────▼───────────────────┐
@@ -71,19 +71,24 @@ The pipeline follows a **Registry-Driven, Micro-Ingestion architecture** organiz
 │                    ┌─────────────────────┐                                  │
 │                    │  check_minio_health │  ← Health gate (fail-fast)       │
 │                    └──────────┬──────────┘                                  │
-│           ┌───────────────────┼───────────────────┐                         │
-│           ▼                   ▼                   ▼              ▼          │
-│  ┌────────────────┐  ┌────────────────┐  ┌──────────────────┐  ┌─────────┐ │
-│  │ ingest_        │  │ ingest_        │  │ ingest_youtube_  │  │ ingest_ │ │
-│  │ philosophers   │  │ gutenberg      │  │ transcripts      │  │ news_api│ │
-│  │ _api           │  │                │  │                  │  │         │ │
-│  └───────┬────────┘  └───────┬────────┘  └────────┬─────────┘  └────┬────┘ │
-│          └───────────────────┴───────────────────┬─┘                │       │
-│                                                  ▼                  │       │
-│                                       ┌──────────────────┐          │       │
-│                                       │ pipeline_complete│ ◄────────┘       │
-│                                       └──────────────────┘                  │
-└──────────────────────────────────────────────────────────────────────────── ┘
+│           ┌───────────────────┼──────────────────┬─────────────────┐        │
+│           ▼                   ▼                  ▼                 ▼        │
+│  ┌────────────────┐  ┌────────────────┐  ┌───────────────┐  ┌──────────────┐│
+│  │ ingest_        │  │ ingest_        │  │ ingest_       │  │ ingest_      ││
+│  │ philosophers   │  │ gutenberg      │  │ podcast_audio │  │ wikipedia    ││
+│  │ _api           │  │                │  │               │  │              ││
+│  └───────┬────────┘  └───────┬────────┘  └───────┬───────┘  └──────┬───────┘│
+│          │                   │                   │                 │        │
+│          └───────────────────┼───────────────────┼─────────────────┘        │
+│                               ▼                  │                          │
+│                      ┌────────────────┐          │                          │
+│                      │ ingest_news_api│ ─────────┘                          │
+│                      └───────┬────────┘                                     │
+│                               ▼                                             │
+│                       ┌──────────────────┐                                  │
+│                       │ pipeline_complete│                                  │
+│                       └──────────────────┘                                  │
+└─────────────────────────────────────────────────────────────────────────────┘
             │                     │                      │              │
 ┌───────────▼─────────────────────▼──────────────────────▼──────────────▼────┐
 │                     STORAGE LAYER — Bronze Landing Zone                     │
@@ -91,15 +96,14 @@ The pipeline follows a **Registry-Driven, Micro-Ingestion architecture** organiz
 │                  MinIO (S3-compatible) — Local Object Store                 │
 │                                                                             │
 │  Bucket: landing-zone                                                       │
-│  ├── philosophers_api/                                                      │
-│  │   ├── raw_json/          ← philosophers_catalog.json                     │
-│  │   └── raw_images/        ← {slug}/{category}/{image_key}.jpg             │
-│  ├── gutenberg/                                                             │
-│  │   └── raw_text/          ← {author}_{book_id}_{title}.txt                │
-│  ├── youtube_transcripts/                                                   │
-│  │   └── raw_json/          ← transcript_{video_id}.json                    │
-│  └── news_api/                                                              │
-│      └── raw_json/          ← news_snapshot_{YYYYMMDD}.json                 │
+│  ├── philosophers_api/  ← (domain filtered)                                 │
+│  ├── gutenberg/         ← raw_text/{domain}/{slug}_{id}.txt                 │
+│  ├── wikipedia/         ← raw_json/{domain}/{slug}_wikipedia.json           │
+│  ├── podcasts/          ← raw_audio/{podcast_slug}/ep_{id}.mp3              │
+│  ├── news_api/          ← raw_json/news_snapshot_{date}.json                │
+│  └── bronze_tables/     ← DELTA LAKE HOUSE (ACID Tables)                    │
+│      ├── philosophers/  ← _delta_log/ + parquet                             │
+│      └── news_headlines/← _delta_log/ + parquet                             │
 │                                                                             │
 │  Host volume bind: ./landing_zone/ → /data (inside MinIO container)         │
 └─────────────────────────────────────────────────────────────────────────────┘
@@ -141,12 +145,22 @@ The entire infrastructure is defined in `docker-compose.yml` and spins up **5 co
 - **Role:** Monitors all DAGs, detects when their schedule triggers (e.g., `@daily`), and dispatches tasks to the LocalExecutor for execution.
 - **Dependencies:** Waits for `airflow-webserver` to be healthy (ensuring the DB is already migrated) before starting.
 
+### Apache Kafka & Zookeeper — The Hot Path
+- **Images:** `confluentinc/cp-kafka`, `confluentinc/cp-zookeeper`
+- **Role:** Handles real-time events and streaming data.
+- **Topic:** `character-mentions` — captures simulated real-time mentions of historical figures across the web.
+- **Consumer:** Flushes stream data into a **Temporal Landing Zone** in MinIO.
+
+### Kafka UI — Stream Monitoring
+- **URL:** [http://localhost:8085](http://localhost:8085)
+- **Role:** Provides visibility into topic traffic, offsets, and consumer group health.
+
 ### Shared Airflow Configuration
 Both Airflow services share a base configuration defined via the YAML anchor `x-airflow-common`:
 - `AIRFLOW__CORE__EXECUTOR=LocalExecutor` — Enables true parallelism within a single machine.
 - `AIRFLOW__DATABASE__SQL_ALCHEMY_CONN` — Points to the PostgreSQL container.
 - **Volume Mounts:** `./orchestration/` → `/opt/airflow/dags/` and `./ingestion/` → `/opt/airflow/ingestion/`. This means every file you edit locally is instantly picked up by the running containers — **no rebuilds required**.
-- **Dynamic pip installs:** `_PIP_ADDITIONAL_REQUIREMENTS=pandas boto3 python-dotenv deltalake` installs these packages at container startup.
+- **Dynamic pip installs:** `_PIP_ADDITIONAL_REQUIREMENTS=pandas boto3 python-dotenv deltalake kafka-python-ng` installs these packages at container startup.
 - **`.env` file injection:** `env_file: - .env` forwards your `.env` secrets directly into both Airflow containers.
 
 ---
@@ -159,6 +173,7 @@ All scripts live in `ingestion/` and follow a strict, consistent design pattern:
 3. Ensure the target bucket exists.
 4. Perform an **Idempotency Check** (`head_object`) before downloading.
 5. Upload raw data as-is (no transformation — that is for the Trusted Zone).
+6. Organize data by **Domain** (philosophy, science, literature) where applicable.
 
 ---
 
@@ -194,26 +209,36 @@ All scripts live in `ingestion/` and follow a strict, consistent design pattern:
 
 ---
 
-### 3. `youtube_transcript_ingest.py` — Podcast Interview Transcripts
-**Sources:** YouTube Data API v3 (search) + `youtube-transcript-api` (download).
+### 3. `podcast_audio_ingest.py` — Conversational Dynamics & Pacing
+**Sources:** iTunes Search API + Podcast RSS Feeds.
 
 **What it does:**
-1. Queries the YouTube Data API v3 `search` endpoint with configured `search_queries`.
-2. **Critical filter 1:** `videoCaption="closedCaption"` — This ensures we only discover videos that have an actual text track available to download, preventing wasted API quota.
-3. **Critical filter 2:** `videoDuration="long"` — This restricts results to videos over 20 minutes, filtering out short clips and YouTube Shorts. Only long-form podcasts and interviews pass through.
-4. **Critical filter 3:** Channel name validation — Results are checked against a `TARGET_CHANNELS` whitelist to restrict downloads to known, high-quality channels.
-5. Aggregates all discovered video IDs into a single Python `set()` for automatic deduplication.
-6. Uses `youtube-transcript-api` version 1.2.4 (requires instantiation via `YouTubeTranscriptApi()`) to download each transcript with `languages=['es', 'en']` (Spanish preferred, English fallback).
-7. Uploads each transcript as a JSON file to MinIO.
-8. Idempotency: Checks for the existence of `transcript_{video_id}.json` in S3 before attempting any download.
+1. Uses a **Discovery-Based** approach to find unstructured audio examples of human conversation.
+2. Queries the iTunes Search API for broad topics (configured in `TARGET_TOPICS`, e.g., "philosophy").
+3. Discovers the top-ranking podcast channels for those topics.
+4. Parses the RSS feeds of those channels to find the latest episodes.
+5. Downloads the `.mp3` or `.m4a` audio files and uploads them raw to MinIO.
+6. Generates a **JSON Metadata Envelope** for each episode containing provenance (podcast name, author, topic source).
+7. Idempotency: Checks for the existence of the audio file in S3 before downloading.
 
-**Storage path:** `s3://landing-zone/youtube_transcripts/raw_json/transcript_{video_id}.json`
-
-> **Note on API Key:** You need a YouTube Data API v3 key in your `.env` file under `YOUTUBE_API_KEY=`. The transcript download itself (via `youtube-transcript-api`) does **not** require an API key.
+**Storage path:** `s3://landing-zone/podcasts/raw_audio/{podcast_slug}/ep_{id}.mp3`
 
 ---
 
-### 4. `news_ingest.py` — Daily Trending News Snapshots
+### 4. `wikipedia_ingest.py` — The Universal Biographical Backbone
+**Source:** Wikipedia REST API (`en.wikipedia.org/api/rest_v1/page/summary`).
+
+**What it does:**
+1. Iterates through **every figure** in the `character_registry.py`.
+2. Fetches a structured biography summary, including a plain-text extract and normalized metadata.
+3. Organizes files strictly by domain subdirectory (philosophy, science, etc.).
+4. This script ensures that even if other sources fail, every historical figure has a baseline of factual knowledge.
+
+**Storage path:** `s3://landing-zone/wikipedia/raw_json/{domain}/{slug}_wikipedia.json`
+
+---
+
+### 5. `news_ingest.py` — Daily Trending News Snapshots
 **Source:** [GNews API](https://gnews.io/) — Aggregates top stories from Google News.
 
 **What it does:**
@@ -226,14 +251,39 @@ All scripts live in `ingestion/` and follow a strict, consistent design pattern:
 
 **Storage path:** `s3://landing-zone/news_api/raw_json/news_snapshot_{YYYYMMDD}.json`
 
+---
+
+### 6. `stream_producer.py` & `stream_consumer.py` — The Hot Path Ingestion
+**Source:** Simulated Real-time Character Mentions (Kafka).
+
+**What it does:**
+1. **Producer:** Generates a real-time stream of JSON messages simulating mentions of characters in historical/academic context with sentiment scores.
+2. **Kafka:** Broker manages the `character-mentions` topic.
+3. **Consumer:** A background process that listens to the stream and flushes messages to MinIO once a buffer size is reached.
+4. This implements the **Streaming Ingestion** requirement of the Data Lakehouse architecture.
+
+**Storage path:** `s3://landing-zone/podcasts/raw_stream/mentions_{timestamp}.json`
+
+---
+
+### 7. `metadata_to_delta.py` — The Lakehouse Transformation
+**Role:** Converts raw semi-structured JSON objects into a structured **Delta Lake** format.
+
+**What it does:**
+1. Reads the latest raw JSON catalogs (Philosophers, News) from the landing zone.
+2. Uses the `deltalake` library to convert them into ACID-compliant Parquet tables.
+3. This adds **time-travel**, **schema enforcement**, and **high-performance querying** to our Bronze layer.
+
+**Storage path:** `s3://landing-zone/bronze_tables/{table_name}/`
+
 > **Note:** The free GNews tier allows 100 requests/day, which is more than sufficient for this daily batch pipeline.
 
 ---
 
-### 5. `philosopher_registry.py` — The Single Source of Truth
+### 6. `character_registry.py` — The Single Source of Truth
 This is **not** an ingestion script — it is the central configuration that all ingestion scripts import from.
 
-It defines a `TARGET_PHILOSOPHERS` list where each philosopher is a dict with all the search terms needed for each source:
+It defines a `TARGET_FIGURES` list where each historical figure is a dict with all search terms needed for each source:
 ```python
 {
     "api_name": "Friedrich Nietzsche",      # Exact match for philosophersapi.com
@@ -244,7 +294,7 @@ It defines a `TARGET_PHILOSOPHERS` list where each philosopher is a dict with al
 }
 ```
 
-**To add a new philosopher to the entire pipeline, you only edit this one file.** All four ingestion scripts pick up the change automatically.
+**To add a new figure (philosopher, scientist, author) to the entire pipeline, you only edit this one file.** All ingestion scripts pick up the change automatically.
 
 **Current targets:** Plato, René Descartes, Immanuel Kant, Georg Wilhelm Friedrich Hegel, Friedrich Nietzsche.
 
@@ -270,8 +320,9 @@ check_minio_health
         │
         ├──► ingest_philosophers_api   ─────┐
         ├──► ingest_gutenberg          ─────┤
-        ├──► ingest_youtube_transcripts─────┤
-        └──► ingest_news_api          ─────┘
+        ├──► ingest_podcast_audio      ─────┤
+        ├──► ingest_wikipedia_biog     ─────┤
+        └──► ingest_news_api           ─────┘
                                             │
                                             ▼
                                    pipeline_complete (EmptyOperator)
@@ -301,17 +352,25 @@ landing_zone/
     │       └── nietzsche/
     ├── gutenberg/
     │   └── raw_text/
-    │       ├── plato_catalog.json               ← Provenance metadata
-    │       ├── plato_1497_The_Republic.txt
-    │       ├── plato_1616_Symposium.txt
-    │       ├── kant_catalog.json
-    │       ├── kant_4280_Critique_of_Pure_Reason.txt
-    │       └── ...
-    ├── youtube_transcripts/
+    │       └── philosophy/
+    │           ├── plato_catalog.json               ← Provenance metadata
+    │           ├── plato_1497_The_Republic.txt
+    │           ├── plato_1616_Symposium.txt
+    │       └── science/
+    │           └── einstein_catalog.json
+    ├── wikipedia/
     │   └── raw_json/
-    │       ├── transcript_L08-xy6cyYY.json
-    │       ├── transcript_XGVGkjZIp7U.json
-    │       └── ...
+    │       ├── philosophy/
+    │       │   └── plato_wikipedia.json
+    │       └── science/
+    │           └── einstein_wikipedia.json
+    ├── podcasts/
+    │   ├── raw_audio/
+    │   │   └── philosophize_this/
+    │   │       └── ep_kant_intro.mp3
+    │   └── metadata/
+    │       └── philosophize_this/
+    │           └── ep_kant_intro_meta.json
     └── news_api/
         └── raw_json/
             ├── news_snapshot_20260408.json       ← Daily trending headlines snapshot
@@ -330,11 +389,15 @@ P1/
 ├── .gitignore                     # Excludes .env, .venv, landing_zone data, etc.
 │
 ├── ingestion/                     # Core ingestion scripts
-│   ├── philosopher_registry.py    # ← Single source of truth for target entities
+│   ├── character_registry.py      # ← Single source of truth for target entities
 │   ├── philosophers_ingest.py     # Philosophers API → JSON + Images → MinIO
 │   ├── gutenberg_ingest.py        # Project Gutenberg → Plain Text Books → MinIO
-│   ├── youtube_transcript_ingest.py # YouTube API → Transcripts JSON → MinIO
-│   └── news_ingest.py             # GNews API → Daily Headlines JSON → MinIO
+│   ├── podcast_audio_ingest.py    # iTunes RSS → Audio .mp3 → MinIO
+│   ├── wikipedia_ingest.py        # Wikipedia API → Bio JSON → MinIO
+│   ├── news_api.py                # GNews API → Daily Headlines JSON → MinIO
+│   ├── stream_producer.py         # SIMULATED trends → Kafka
+│   ├── stream_consumer.py         # Kafka → MinIO (Hot Path)
+│   └── metadata_to_delta.py       # JSON → Delta Lake (Lakehouse conversion)
 │
 ├── orchestration/                 # Airflow DAG definitions
 │   └── bdm_p1_pipeline_dag.py     # Daily batch DAG (4 parallel tasks)
@@ -359,7 +422,6 @@ P1/
 
 | Service | Key Variable | How to Get |
 |---|---|---|
-| YouTube Data API v3 | `YOUTUBE_API_KEY` | [Google Cloud Console](https://console.cloud.google.com/) → APIs & Services → Enable YouTube Data API v3 → Create Credentials |
 | GNews API | `NEWS_API_KEY` | Register at [gnews.io](https://gnews.io/) → Free tier gives 100 req/day |
 
 > The Philosophers API and Project Gutenberg/Gutendex are completely **public and require no authentication**.
@@ -367,7 +429,6 @@ P1/
 ### Python Dependencies (`requirements.txt`)
 ```
 requests>=2.31.0             # HTTP client for all API calls
-youtube-transcript-api>=0.6.2# YouTube CC transcript downloader (no key needed)
 boto3>=1.34.0                # AWS SDK — used to talk to MinIO (S3-compatible)
 python-dotenv>=1.0.0         # Loads .env into os.environ
 apache-airflow>=2.9.0        # Workflow orchestration
@@ -396,7 +457,6 @@ MINIO_SECRET_KEY=password
 MINIO_BUCKET=landing-zone
 
 # ─── External API Keys ─────────────────────────────────────────────────────
-YOUTUBE_API_KEY=YOUR_YOUTUBE_DATA_API_V3_KEY_HERE
 NEWS_API_KEY=YOUR_GNEWS_API_KEY_HERE
 ```
 
@@ -466,7 +526,8 @@ docker compose up -d
 # 4. Run the target script directly
 python ingestion/philosophers_ingest.py
 python ingestion/gutenberg_ingest.py
-python ingestion/youtube_transcript_ingest.py
+python ingestion/podcast_audio_ingest.py
+python ingestion/wikipedia_ingest.py
 python ingestion/news_ingest.py
 ```
 
@@ -485,10 +546,10 @@ MinIO is a drop-in S3-compatible replacement. Every single `boto3` call in this 
 The default SQLite backend creates file-level locks that cause deadlocks when the `LocalExecutor` tries to run multiple tasks in parallel. PostgreSQL is the industry standard for production Airflow deployments and resolves all parallelism issues.
 
 ### Why the `philosopher_registry.py` pattern?
-Rather than hardcoding philosopher names differently in each of four scripts, every search term for every source is centralized in one dictionary. Adding "Aristotle" to the pipeline is a **single-line edit** to the registry file — all four scripts automatically pick it up on the next run.
+Rather than hardcoding names differently in each script, every search term for every source is centralized in one dictionary. Adding a new figure to the pipeline is a **single-line edit** to the registry file — all scripts automatically pick it up on the next run.
 
-### Why `youtube-transcript-api` instead of downloading audio?
-Audio files are large, difficult to process, and would quickly consume disk space. Pure text transcripts give us the exact same conversational data with a fraction of the storage footprint, and they can be directly fed into a language model without requiring a separate speech-to-text step.
+### Why Podcasts instead of downloading Youtube?
+Audio files provide the raw conversational data needed for future voice-cloning and tone-analysis steps. While YouTube transcripts are pure text, podcasts provide both the content and the acoustic performance, making the AI's future generation more "human."
 
 ### Why Top Headlines news instead of keyword search?
 Our AI does not need to know specific facts about AI ethics covered in academic papers—that is what the Philosophers API and Gutenberg cover. What it needs for the interview format is **whatever people are currently talking about** so it can simulate a real-time reaction. Top headlines from `world`, `technology`, and `science` categories provide this ambient awareness of the zeitgeist.
