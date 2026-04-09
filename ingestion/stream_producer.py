@@ -1,13 +1,16 @@
 import json
 import logging
+import os
 import random
 import time
 from datetime import datetime, timezone
 
 from kafka import KafkaProducer
+from dotenv import load_dotenv
 from character_registry import TARGET_FIGURES
 
 # ─── Configuration ────────────────────────────────────────────────────────────
+load_dotenv()
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] producer — %(message)s",

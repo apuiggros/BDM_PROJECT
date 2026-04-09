@@ -18,3 +18,4 @@ pyarrow>=15.0.0           # Underpinning for Delta/Parquet storage
 
 # ─── Streaming / Messaging ────────────────────────────────────────────────────
 kafka-python-ng>=2.2.0    # Kafka client (Producer/Consumer)
+

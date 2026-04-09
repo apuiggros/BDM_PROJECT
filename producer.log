@@ -1,4 +1,30 @@
+2026-04-09 16:13:31,577 [INFO] producer — Connecting to Kafka broker at localhost:9092...
+2026-04-09 16:13:31,579 [INFO] producer — <BrokerConnection node_id=bootstrap-0 host=localhost:9092 <connecting> [IPv4 ('127.0.0.1', 9092)]>: connecting to localhost:9092 [('127.0.0.1', 9092) IPv4]
+2026-04-09 16:13:31,580 [INFO] producer — Probing node bootstrap-0 broker version
+2026-04-09 16:13:31,580 [INFO] producer — <BrokerConnection node_id=bootstrap-0 host=localhost:9092 <connecting> [IPv4 ('127.0.0.1', 9092)]>: Connection complete.
+2026-04-09 16:13:31,682 [INFO] producer — Broker version identified as 2.6.0
+2026-04-09 16:13:31,683 [INFO] producer — Set configuration api_version=(2, 6, 0) to skip auto check_version requests on startup
+2026-04-09 16:13:31,684 [INFO] producer — Producer started. Sending simulated mentions to topic: character-mentions
+2026-04-09 16:13:31,686 [INFO] producer —   >> Sent mention for: Friedrich Nietzsche
+2026-04-09 16:13:31,686 [INFO] producer — <BrokerConnection node_id=1 host=localhost:9092 <connecting> [IPv4 ('127.0.0.1', 9092)]>: connecting to localhost:9092 [('127.0.0.1', 9092) IPv4]
+2026-04-09 16:13:31,687 [INFO] producer — <BrokerConnection node_id=1 host=localhost:9092 <connecting> [IPv4 ('127.0.0.1', 9092)]>: Connection complete.
+2026-04-09 16:13:31,687 [INFO] producer — <BrokerConnection node_id=bootstrap-0 host=localhost:9092 <connected> [IPv4 ('127.0.0.1', 9092)]>: Closing connection. 
+2026-04-09 16:13:33,003 [INFO] producer —   >> Sent mention for: Mark Twain
+2026-04-09 16:13:35,535 [INFO] producer —   >> Sent mention for: René Descartes
+2026-04-09 16:13:39,475 [INFO] producer —   >> Sent mention for: Georg Wilhelm Friedrich Hegel
+2026-04-09 16:13:44,006 [INFO] producer —   >> Sent mention for: Immanuel Kant
+2026-04-09 16:13:44,787 [INFO] producer — Closing the Kafka producer with 9223372036.0 secs timeout.
+2026-04-09 16:13:44,788 [INFO] producer — <BrokerConnection node_id=1 host=localhost:9092 <connected> [IPv4 ('127.0.0.1', 9092)]>: Closing connection. 
 Traceback (most recent call last):
-  File "/home/apuiggros/courses/BDM/P1/ingestion/stream_producer.py", line 17, in <module>
-    KAFKA_BROKER = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092")
-NameError: name 'os' is not defined
+  File "/home/apuiggros/courses/BDM/P1/ingestion/stream_producer.py", line 76, in run_producer
+    time.sleep(random.uniform(1.0, 5.0))
+KeyboardInterrupt
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/apuiggros/courses/BDM/P1/ingestion/stream_producer.py", line 83, in <module>
+    run_producer()
+  File "/home/apuiggros/courses/BDM/P1/ingestion/stream_producer.py", line 76, in run_producer
+    time.sleep(random.uniform(1.0, 5.0))
+KeyboardInterrupt

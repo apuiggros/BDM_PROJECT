@@ -85,6 +85,10 @@ The pipeline follows a **Registry-Driven, Micro-Ingestion architecture** organiz
 │                      │ ingest_news_api│ ─────────┘                          │
 │                      └───────┬────────┘                                     │
 │                               ▼                                             │
+│                     ┌──────────────────┐                                    │
+│                     │ convert_to_delta │                                    │
+│                     └────────┬─────────┘                                    │
+│                               ▼                                             │
 │                       ┌──────────────────┐                                  │
 │                       │ pipeline_complete│                                  │
 │                       └──────────────────┘                                  │
@@ -102,8 +106,11 @@ The pipeline follows a **Registry-Driven, Micro-Ingestion architecture** organiz
 │  ├── podcasts/          ← raw_audio/{podcast_slug}/ep_{id}.mp3              │
 │  ├── news_api/          ← raw_json/news_snapshot_{date}.json                │
 │  └── bronze_tables/     ← DELTA LAKE HOUSE (ACID Tables)                    │
-│      ├── philosophers/  ← _delta_log/ + parquet                             │
-│      └── news_headlines/← _delta_log/ + parquet                             │
+│      ├── philosophers/  ← Unified metadata from Philosophers API            │
+│      ├── news_headlines/← Daily aggregated news snapshots                   │
+│      ├── wikipedia_biographies/ ← Structured character summaries (Facts)    │
+│      ├── gutenberg_library/     ← Catalog of available texts                │
+│      └── podcast_episodes/      ← Metadata for downloaded audio             │
 │                                                                             │
 │  Host volume bind: ./landing_zone/ → /data (inside MinIO container)         │
 └─────────────────────────────────────────────────────────────────────────────┘
@@ -266,13 +273,18 @@ All scripts live in `ingestion/` and follow a strict, consistent design pattern:
 
 ---
 
-### 7. `metadata_to_delta.py` — The Lakehouse Transformation
-**Role:** Converts raw semi-structured JSON objects into a structured **Delta Lake** format.
+### 7. `metadata_to_delta.py` — The Master Lakehouse Orchestrator
+**Role:** Converts raw semi-structured JSON objects from all sources into a structured **Delta Lake** format.
 
 **What it does:**
-1. Reads the latest raw JSON catalogs (Philosophers, News) from the landing zone.
-2. Uses the `deltalake` library to convert them into ACID-compliant Parquet tables.
-3. This adds **time-travel**, **schema enforcement**, and **high-performance querying** to our Bronze layer.
+1. **Unified Aggregation:** Instead of hundreds of individual JSON files, it creates 5 consolidated "Master Tables."
+2. **Delta Tables Created:**
+   - `philosophers`: All core metadata from the Philosophers API.
+   - `news_headlines`: A history of all daily news snapshots.
+   - `wikipedia_biographies`: Factual summaries (biographies) for all characters.
+   - `gutenberg_library`: A searchable catalog of every text file available.
+   - `podcast_episodes`: An index of all audio files with their durations and descriptions.
+3. **Big Data Features:** Adds **Time Travel**, **Schema Enforcement**, and high-speed **Parquet** storage to the Bronze Layer.
 
 **Storage path:** `s3://landing-zone/bronze_tables/{table_name}/`
 
@@ -325,7 +337,10 @@ check_minio_health
         └──► ingest_news_api           ─────┘
                                             │
                                             ▼
-                                   pipeline_complete (EmptyOperator)
+                                     convert_to_delta
+                                            │
+                                            ▼
+                                     pipeline_complete
 ```
 
 **How tasks execute:** Each ingestion task calls `_run_ingestion_script()`, which runs the Python script as a subprocess using `sys.executable` (the same Python interpreter as Airflow). Stdout/Stderr are captured and forwarded to the Airflow task log.

@@ -1,25 +1,27 @@
-2026-04-09 12:29:52,180 [INFO] consumer — Connecting to Kafka broker at localhost:9092 for topic 'character-mentions'...
-2026-04-09 12:29:52,181 [INFO] consumer — <BrokerConnection node_id=bootstrap-0 host=localhost:9092 <connecting> [IPv4 ('127.0.0.1', 9092)]>: connecting to localhost:9092 [('127.0.0.1', 9092) IPv4]
-2026-04-09 12:29:52,181 [INFO] consumer — Probing node bootstrap-0 broker version
-2026-04-09 12:29:52,181 [INFO] consumer — <BrokerConnection node_id=bootstrap-0 host=localhost:9092 <connecting> [IPv4 ('127.0.0.1', 9092)]>: Connection complete.
-2026-04-09 12:29:52,287 [INFO] consumer — Broker version identified as 2.6.0
-2026-04-09 12:29:52,287 [INFO] consumer — Set configuration api_version=(2, 6, 0) to skip auto check_version requests on startup
-2026-04-09 12:29:52,289 [INFO] consumer — Updating subscribed topics to: ('character-mentions',)
-2026-04-09 12:29:52,289 [INFO] consumer — Consumer started. Listening for messages...
-2026-04-09 12:29:53,209 [INFO] consumer — Group coordinator for landing-zone-capture is BrokerMetadata(nodeId='coordinator-1', host='localhost', port=9092, rack=None)
-2026-04-09 12:29:53,209 [INFO] consumer — Discovered coordinator coordinator-1 for group landing-zone-capture
-2026-04-09 12:29:53,209 [INFO] consumer — Starting new heartbeat thread
-2026-04-09 12:29:53,210 [INFO] consumer — Revoking previously assigned partitions set() for group landing-zone-capture
-2026-04-09 12:29:53,211 [INFO] consumer — <BrokerConnection node_id=coordinator-1 host=localhost:9092 <connecting> [IPv4 ('127.0.0.1', 9092)]>: connecting to localhost:9092 [('127.0.0.1', 9092) IPv4]
-2026-04-09 12:29:53,212 [INFO] consumer — <BrokerConnection node_id=coordinator-1 host=localhost:9092 <connecting> [IPv4 ('127.0.0.1', 9092)]>: Connection complete.
-2026-04-09 12:29:53,212 [INFO] consumer — <BrokerConnection node_id=bootstrap-0 host=localhost:9092 <connected> [IPv4 ('127.0.0.1', 9092)]>: Closing connection. 
-2026-04-09 12:29:53,313 [INFO] consumer — (Re-)joining group landing-zone-capture
-2026-04-09 12:29:53,315 [INFO] consumer — <BrokerConnection node_id=bootstrap-0 host=localhost:9092 <connecting> [IPv4 ('127.0.0.1', 9092)]>: connecting to localhost:9092 [('127.0.0.1', 9092) IPv4]
-2026-04-09 12:29:53,315 [INFO] consumer — <BrokerConnection node_id=bootstrap-0 host=localhost:9092 <connecting> [IPv4 ('127.0.0.1', 9092)]>: Connection complete.
-2026-04-09 12:29:53,356 [INFO] consumer — Elected group leader -- performing partition assignments using range
-2026-04-09 12:29:53,385 [INFO] consumer — Successfully joined group landing-zone-capture with generation 1
-2026-04-09 12:29:53,385 [INFO] consumer — Updated partition assignment: [TopicPartition(topic='character-mentions', partition=0)]
-2026-04-09 12:29:53,385 [INFO] consumer — Setting newly assigned partitions {TopicPartition(topic='character-mentions', partition=0)} for group landing-zone-capture
-2026-04-09 12:29:53,394 [INFO] consumer — <BrokerConnection node_id=1 host=localhost:9092 <connecting> [IPv4 ('127.0.0.1', 9092)]>: connecting to localhost:9092 [('127.0.0.1', 9092) IPv4]
-2026-04-09 12:29:53,394 [INFO] consumer — <BrokerConnection node_id=1 host=localhost:9092 <connecting> [IPv4 ('127.0.0.1', 9092)]>: Connection complete.
-2026-04-09 12:29:53,394 [INFO] consumer — <BrokerConnection node_id=bootstrap-0 host=localhost:9092 <connected> [IPv4 ('127.0.0.1', 9092)]>: Closing connection. 
+2026-04-09 16:13:29,605 [INFO] consumer — Connecting to Kafka broker at localhost:9092 for topic 'character-mentions'...
+2026-04-09 16:13:29,605 [INFO] consumer — <BrokerConnection node_id=bootstrap-0 host=localhost:9092 <connecting> [IPv4 ('127.0.0.1', 9092)]>: connecting to localhost:9092 [('127.0.0.1', 9092) IPv4]
+2026-04-09 16:13:29,606 [INFO] consumer — Probing node bootstrap-0 broker version
+2026-04-09 16:13:29,606 [INFO] consumer — <BrokerConnection node_id=bootstrap-0 host=localhost:9092 <connecting> [IPv4 ('127.0.0.1', 9092)]>: Connection complete.
+2026-04-09 16:13:29,708 [INFO] consumer — Broker version identified as 2.6.0
+2026-04-09 16:13:29,708 [INFO] consumer — Set configuration api_version=(2, 6, 0) to skip auto check_version requests on startup
+2026-04-09 16:13:29,709 [INFO] consumer — Updating subscribed topics to: ('character-mentions',)
+2026-04-09 16:13:29,709 [INFO] consumer — Consumer started. Listening for messages...
+2026-04-09 16:13:29,711 [INFO] consumer — Group coordinator for landing-zone-capture is BrokerMetadata(nodeId='coordinator-1', host='localhost', port=9092, rack=None)
+2026-04-09 16:13:29,711 [INFO] consumer — Discovered coordinator coordinator-1 for group landing-zone-capture
+2026-04-09 16:13:29,711 [INFO] consumer — Starting new heartbeat thread
+2026-04-09 16:13:29,712 [INFO] consumer — Revoking previously assigned partitions set() for group landing-zone-capture
+2026-04-09 16:13:29,712 [INFO] consumer — <BrokerConnection node_id=coordinator-1 host=localhost:9092 <connecting> [IPv4 ('127.0.0.1', 9092)]>: connecting to localhost:9092 [('127.0.0.1', 9092) IPv4]
+2026-04-09 16:13:29,712 [INFO] consumer — <BrokerConnection node_id=coordinator-1 host=localhost:9092 <connecting> [IPv4 ('127.0.0.1', 9092)]>: Connection complete.
+2026-04-09 16:13:29,713 [INFO] consumer — <BrokerConnection node_id=bootstrap-0 host=localhost:9092 <connected> [IPv4 ('127.0.0.1', 9092)]>: Closing connection. 
+2026-04-09 16:13:29,813 [INFO] consumer — (Re-)joining group landing-zone-capture
+2026-04-09 16:13:29,820 [INFO] consumer — Elected group leader -- performing partition assignments using range
+2026-04-09 16:13:29,821 [INFO] consumer — <BrokerConnection node_id=1 host=localhost:9092 <connecting> [IPv4 ('127.0.0.1', 9092)]>: connecting to localhost:9092 [('127.0.0.1', 9092) IPv4]
+2026-04-09 16:13:29,821 [INFO] consumer — <BrokerConnection node_id=1 host=localhost:9092 <connecting> [IPv4 ('127.0.0.1', 9092)]>: Connection complete.
+2026-04-09 16:13:29,826 [INFO] consumer — Successfully joined group landing-zone-capture with generation 5
+2026-04-09 16:13:29,826 [INFO] consumer — Updated partition assignment: [TopicPartition(topic='character-mentions', partition=0)]
+2026-04-09 16:13:29,826 [INFO] consumer — Setting newly assigned partitions {TopicPartition(topic='character-mentions', partition=0)} for group landing-zone-capture
+2026-04-09 16:13:31,690 [INFO] consumer —   << Received mention for: Friedrich Nietzsche
+2026-04-09 16:13:33,006 [INFO] consumer —   << Received mention for: Mark Twain
+2026-04-09 16:13:35,538 [INFO] consumer —   << Received mention for: René Descartes
+2026-04-09 16:13:39,579 [INFO] consumer —   << Received mention for: Georg Wilhelm Friedrich Hegel
+2026-04-09 16:13:44,010 [INFO] consumer —   << Received mention for: Immanuel Kant

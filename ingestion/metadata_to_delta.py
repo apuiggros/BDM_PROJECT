@@ -95,11 +95,89 @@ def convert_news_to_delta(client):
     except Exception as e:
         logger.error("  ✗ Failed to convert news: %s", e)
 
+def convert_wikipedia_to_delta(client):
+    """Aggregates all character Wikipedia summaries into a single Delta table."""
+    logger.info("Converting Wikipedia Summaries to Delta...")
+    prefix = "wikipedia/raw_json/"
+    
+    try:
+        paginator = client.get_paginator('list_objects_v2')
+        all_data = []
+        
+        for page in paginator.paginate(Bucket=MINIO_BUCKET, Prefix=prefix):
+            for obj in page.get('Contents', []):
+                if obj['Key'].endswith('_wikipedia.json'):
+                    resp = client.get_object(Bucket=MINIO_BUCKET, Key=obj['Key'])
+                    item = json.loads(resp['Body'].read().decode('utf-8'))
+                    # Extract domain from path: wikipedia/raw_json/{domain}/...
+                    parts = obj['Key'].split('/')
+                    item['_domain'] = parts[2]
+                    all_data.append(item)
+        
+        if all_data:
+            df = pd.json_normalize(all_data)
+            table_path = f"{DELTA_ROOT}/wikipedia_biographies"
+            write_deltalake(table_path, df, mode="overwrite")
+            logger.info("  ✓ Delta table updated: %s (%d records)", table_path, len(all_data))
+    except Exception as e:
+        logger.error("  ✗ Failed to convert wikipedia: %s", e)
+
+def convert_gutenberg_metadata_to_delta(client):
+    """Aggregates all Gutenberg catalogs into a single Delta table."""
+    logger.info("Converting Gutenberg Library to Delta...")
+    prefix = "gutenberg/raw_text/"
+    
+    try:
+        paginator = client.get_paginator('list_objects_v2')
+        all_data = []
+        
+        for page in paginator.paginate(Bucket=MINIO_BUCKET, Prefix=prefix):
+            for obj in page.get('Contents', []):
+                if obj['Key'].endswith('_catalog.json'):
+                    resp = client.get_object(Bucket=MINIO_BUCKET, Key=obj['Key'])
+                    item = json.loads(resp['Body'].read().decode('utf-8'))
+                    all_data.append(item)
+        
+        if all_data:
+            df = pd.json_normalize(all_data)
+            table_path = f"{DELTA_ROOT}/gutenberg_library"
+            write_deltalake(table_path, df, mode="overwrite")
+            logger.info("  ✓ Delta table updated: %s (%d records)", table_path, len(all_data))
+    except Exception as e:
+        logger.error("  ✗ Failed to convert gutenberg: %s", e)
+
+def convert_podcast_metadata_to_delta(client):
+    """Aggregates all podcast episode metadata into a single Delta table."""
+    logger.info("Converting Podcast Episodes to Delta...")
+    prefix = "podcasts/metadata/"
+    
+    try:
+        paginator = client.get_paginator('list_objects_v2')
+        all_data = []
+        
+        for page in paginator.paginate(Bucket=MINIO_BUCKET, Prefix=prefix):
+            for obj in page.get('Contents', []):
+                if obj['Key'].endswith('_meta.json'):
+                    resp = client.get_object(Bucket=MINIO_BUCKET, Key=obj['Key'])
+                    item = json.loads(resp['Body'].read().decode('utf-8'))
+                    all_data.append(item)
+        
+        if all_data:
+            df = pd.json_normalize(all_data)
+            table_path = f"{DELTA_ROOT}/podcast_episodes"
+            write_deltalake(table_path, df, mode="overwrite")
+            logger.info("  ✓ Delta table updated: %s (%d records)", table_path, len(all_data))
+    except Exception as e:
+        logger.error("  ✗ Failed to convert podcasts: %s", e)
+
 # ─── Main Execution ───────────────────────────────────────────────────────────
 def run():
     client = get_minio_client()
     convert_philosophers_to_delta(client)
     convert_news_to_delta(client)
+    convert_wikipedia_to_delta(client)
+    convert_gutenberg_metadata_to_delta(client)
+    convert_podcast_metadata_to_delta(client)
     logger.info("✓ Delta Lake conversion complete.")
 
 if __name__ == "__main__":
