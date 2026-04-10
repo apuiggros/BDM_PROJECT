@@ -25,3 +25,25 @@
 2026-04-09 16:13:35,538 [INFO] consumer —   << Received mention for: René Descartes
 2026-04-09 16:13:39,579 [INFO] consumer —   << Received mention for: Georg Wilhelm Friedrich Hegel
 2026-04-09 16:13:44,010 [INFO] consumer —   << Received mention for: Immanuel Kant
+2026-04-09 16:54:09,407 [WARNING] consumer — Heartbeat session expired, marking coordinator dead
+2026-04-09 16:54:09,459 [WARNING] consumer — Marking the coordinator dead (node coordinator-1) for group landing-zone-capture: Heartbeat session expired.
+2026-04-09 16:54:09,481 [INFO] consumer — Group coordinator for landing-zone-capture is BrokerMetadata(nodeId='coordinator-1', host='localhost', port=9092, rack=None)
+2026-04-09 16:54:09,483 [INFO] consumer — Discovered coordinator coordinator-1 for group landing-zone-capture
+2026-04-09 17:25:24,717 [INFO] consumer — Closing idle connection coordinator-1, last active 1872227 ms ago
+2026-04-09 17:25:24,719 [INFO] consumer — <BrokerConnection node_id=coordinator-1 host=localhost:9092 <connected> [IPv4 ('127.0.0.1', 9092)]>: Closing connection. 
+2026-04-09 17:25:24,732 [WARNING] consumer — Heartbeat session expired, marking coordinator dead
+2026-04-09 17:25:24,733 [WARNING] consumer — Marking the coordinator dead (node coordinator-1) for group landing-zone-capture: Heartbeat session expired.
+2026-04-09 17:25:24,740 [INFO] consumer — Group coordinator for landing-zone-capture is BrokerMetadata(nodeId='coordinator-1', host='localhost', port=9092, rack=None)
+2026-04-09 17:25:24,741 [INFO] consumer — Discovered coordinator coordinator-1 for group landing-zone-capture
+2026-04-09 17:25:24,771 [INFO] consumer — <BrokerConnection node_id=coordinator-1 host=localhost:9092 <connecting> [IPv4 ('127.0.0.1', 9092)]>: connecting to localhost:9092 [('127.0.0.1', 9092) IPv4]
+2026-04-09 17:25:24,773 [INFO] consumer — <BrokerConnection node_id=coordinator-1 host=localhost:9092 <connecting> [IPv4 ('127.0.0.1', 9092)]>: Connection complete.
+2026-04-09 17:25:25,285 [WARNING] consumer — Auto offset commit failed for group landing-zone-capture: NodeNotReadyError: coordinator-1
+2026-04-10 12:28:18,933 [INFO] consumer — Closing idle connection coordinator-1, last active 68565179 ms ago
+2026-04-10 12:28:18,934 [INFO] consumer — <BrokerConnection node_id=coordinator-1 host=localhost:9092 <connected> [IPv4 ('127.0.0.1', 9092)]>: Closing connection. 
+2026-04-10 12:28:18,935 [WARNING] consumer — Heartbeat session expired, marking coordinator dead
+2026-04-10 12:28:18,935 [WARNING] consumer — Marking the coordinator dead (node coordinator-1) for group landing-zone-capture: Heartbeat session expired.
+2026-04-10 12:28:18,939 [INFO] consumer — Group coordinator for landing-zone-capture is BrokerMetadata(nodeId='coordinator-1', host='localhost', port=9092, rack=None)
+2026-04-10 12:28:18,939 [INFO] consumer — Discovered coordinator coordinator-1 for group landing-zone-capture
+2026-04-10 12:28:18,943 [INFO] consumer — <BrokerConnection node_id=coordinator-1 host=localhost:9092 <connecting> [IPv4 ('127.0.0.1', 9092)]>: connecting to localhost:9092 [('127.0.0.1', 9092) IPv4]
+2026-04-10 12:28:18,944 [INFO] consumer — <BrokerConnection node_id=coordinator-1 host=localhost:9092 <connecting> [IPv4 ('127.0.0.1', 9092)]>: Connection complete.
+2026-04-10 12:28:19,452 [WARNING] consumer — Auto offset commit failed for group landing-zone-capture: NodeNotReadyError: coordinator-1
