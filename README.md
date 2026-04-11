@@ -104,6 +104,7 @@ The pipeline follows a **Registry-Driven, Micro-Ingestion architecture** organiz
 │  ├── gutenberg/         ← raw_text/{domain}/{slug}_{id}.txt                 │
 │  ├── wikipedia/         ← raw_json/{domain}/{slug}_wikipedia.json           │
 │  ├── podcasts/          ← raw_audio/{podcast_slug}/ep_{id}.mp3              │
+│  ├── hot_path/          ← raw_stream/mentions_{timestamp}.json              │
 │  ├── news_api/          ← raw_json/news_snapshot_{date}.json                │
 │  └── bronze_tables/     ← DELTA LAKE HOUSE (ACID Tables)                    │
 │      ├── philosophers/  ← Unified metadata from Philosophers API            │
@@ -269,7 +270,7 @@ All scripts live in `ingestion/` and follow a strict, consistent design pattern:
 3. **Consumer:** A background process that listens to the stream and flushes messages to MinIO once a buffer size is reached.
 4. This implements the **Streaming Ingestion** requirement of the Data Lakehouse architecture.
 
-**Storage path:** `s3://landing-zone/podcasts/raw_stream/mentions_{timestamp}.json`
+**Storage path:** `s3://landing-zone/hot_path/raw_stream/mentions_{timestamp}.json`
 
 ---
 

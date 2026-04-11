@@ -47,3 +47,96 @@
 2026-04-10 12:28:18,943 [INFO] consumer — <BrokerConnection node_id=coordinator-1 host=localhost:9092 <connecting> [IPv4 ('127.0.0.1', 9092)]>: connecting to localhost:9092 [('127.0.0.1', 9092) IPv4]
 2026-04-10 12:28:18,944 [INFO] consumer — <BrokerConnection node_id=coordinator-1 host=localhost:9092 <connecting> [IPv4 ('127.0.0.1', 9092)]>: Connection complete.
 2026-04-10 12:28:19,452 [WARNING] consumer — Auto offset commit failed for group landing-zone-capture: NodeNotReadyError: coordinator-1
+2026-04-10 14:22:46,026 [INFO] consumer — Closing idle connection coordinator-1, last active 663405 ms ago
+2026-04-10 14:22:46,045 [INFO] consumer — <BrokerConnection node_id=coordinator-1 host=localhost:9092 <connected> [IPv4 ('127.0.0.1', 9092)]>: Closing connection. 
+2026-04-10 14:22:46,050 [WARNING] consumer — Heartbeat session expired, marking coordinator dead
+2026-04-10 14:22:46,051 [WARNING] consumer — Marking the coordinator dead (node coordinator-1) for group landing-zone-capture: Heartbeat session expired.
+2026-04-10 14:22:46,060 [INFO] consumer — Group coordinator for landing-zone-capture is BrokerMetadata(nodeId='coordinator-1', host='localhost', port=9092, rack=None)
+2026-04-10 14:22:46,060 [INFO] consumer — Discovered coordinator coordinator-1 for group landing-zone-capture
+2026-04-10 14:22:46,067 [INFO] consumer — <BrokerConnection node_id=coordinator-1 host=localhost:9092 <connecting> [IPv4 ('127.0.0.1', 9092)]>: connecting to localhost:9092 [('127.0.0.1', 9092) IPv4]
+2026-04-10 14:22:46,068 [INFO] consumer — <BrokerConnection node_id=coordinator-1 host=localhost:9092 <connecting> [IPv4 ('127.0.0.1', 9092)]>: Connection complete.
+2026-04-10 16:13:46,236 [INFO] consumer — Closing idle connection coordinator-1, last active 6660167 ms ago
+2026-04-10 16:13:46,236 [INFO] consumer — <BrokerConnection node_id=coordinator-1 host=localhost:9092 <connected> [IPv4 ('127.0.0.1', 9092)]>: Closing connection. 
+2026-04-10 16:13:46,237 [WARNING] consumer — Auto offset commit failed for group landing-zone-capture: NodeNotReadyError: coordinator-1
+2026-04-10 16:13:46,275 [WARNING] consumer — Heartbeat session expired, marking coordinator dead
+2026-04-10 16:13:46,276 [WARNING] consumer — Marking the coordinator dead (node coordinator-1) for group landing-zone-capture: Heartbeat session expired.
+2026-04-10 16:13:46,357 [INFO] consumer — Group coordinator for landing-zone-capture is BrokerMetadata(nodeId='coordinator-1', host='localhost', port=9092, rack=None)
+2026-04-10 16:13:46,357 [INFO] consumer — Discovered coordinator coordinator-1 for group landing-zone-capture
+2026-04-10 16:13:46,358 [INFO] consumer — <BrokerConnection node_id=coordinator-1 host=localhost:9092 <connecting> [IPv4 ('127.0.0.1', 9092)]>: connecting to localhost:9092 [('127.0.0.1', 9092) IPv4]
+2026-04-10 16:13:46,359 [INFO] consumer — <BrokerConnection node_id=coordinator-1 host=localhost:9092 <connecting> [IPv4 ('127.0.0.1', 9092)]>: Connection complete.
+2026-04-10 16:13:46,873 [WARNING] consumer — Auto offset commit failed for group landing-zone-capture: NodeNotReadyError: coordinator-1
+2026-04-10 17:43:58,477 [INFO] consumer — Closing idle connection coordinator-1, last active 5409116 ms ago
+2026-04-10 17:43:58,477 [INFO] consumer — <BrokerConnection node_id=coordinator-1 host=localhost:9092 <connected> [IPv4 ('127.0.0.1', 9092)]>: Closing connection. 
+2026-04-10 17:43:58,478 [INFO] consumer — <BrokerConnection node_id=coordinator-1 host=localhost:9092 <connecting> [IPv4 ('127.0.0.1', 9092)]>: connecting to localhost:9092 [('127.0.0.1', 9092) IPv4]
+2026-04-10 17:43:58,479 [INFO] consumer — <BrokerConnection node_id=coordinator-1 host=localhost:9092 <connecting> [IPv4 ('127.0.0.1', 9092)]>: Connection complete.
+2026-04-10 17:43:58,479 [WARNING] consumer — Heartbeat session expired, marking coordinator dead
+2026-04-10 17:43:58,480 [WARNING] consumer — Marking the coordinator dead (node coordinator-1) for group landing-zone-capture: Heartbeat session expired.
+2026-04-10 17:43:58,480 [WARNING] consumer — Auto offset commit failed for group landing-zone-capture: NodeNotReadyError: coordinator-1
+2026-04-10 17:43:58,482 [INFO] consumer — Group coordinator for landing-zone-capture is BrokerMetadata(nodeId='coordinator-1', host='localhost', port=9092, rack=None)
+2026-04-10 17:43:58,482 [INFO] consumer — Discovered coordinator coordinator-1 for group landing-zone-capture
+2026-04-10 17:46:05,024 [WARNING] consumer — Heartbeat session expired, marking coordinator dead
+2026-04-10 17:46:05,025 [WARNING] consumer — Marking the coordinator dead (node coordinator-1) for group landing-zone-capture: Heartbeat session expired.
+2026-04-10 17:46:05,029 [INFO] consumer — Group coordinator for landing-zone-capture is BrokerMetadata(nodeId='coordinator-1', host='localhost', port=9092, rack=None)
+2026-04-10 17:46:05,029 [INFO] consumer — Discovered coordinator coordinator-1 for group landing-zone-capture
+2026-04-11 00:34:31,036 [INFO] consumer — Closing idle connection coordinator-1, last active 17058659 ms ago
+2026-04-11 00:34:31,057 [INFO] consumer — <BrokerConnection node_id=coordinator-1 host=localhost:9092 <connected> [IPv4 ('127.0.0.1', 9092)]>: Closing connection. 
+2026-04-11 00:34:31,065 [WARNING] consumer — Heartbeat session expired, marking coordinator dead
+2026-04-11 00:34:31,066 [WARNING] consumer — Marking the coordinator dead (node coordinator-1) for group landing-zone-capture: Heartbeat session expired.
+2026-04-11 00:34:31,081 [INFO] consumer — Group coordinator for landing-zone-capture is BrokerMetadata(nodeId='coordinator-1', host='localhost', port=9092, rack=None)
+2026-04-11 00:34:31,081 [INFO] consumer — Discovered coordinator coordinator-1 for group landing-zone-capture
+2026-04-11 00:34:31,093 [INFO] consumer — <BrokerConnection node_id=coordinator-1 host=localhost:9092 <connecting> [IPv4 ('127.0.0.1', 9092)]>: connecting to localhost:9092 [('127.0.0.1', 9092) IPv4]
+2026-04-11 00:34:31,095 [INFO] consumer — <BrokerConnection node_id=coordinator-1 host=localhost:9092 <connecting> [IPv4 ('127.0.0.1', 9092)]>: Connection complete.
+2026-04-11 00:34:31,601 [WARNING] consumer — Auto offset commit failed for group landing-zone-capture: NodeNotReadyError: coordinator-1
+2026-04-11 01:40:55,776 [INFO] consumer — Closing idle connection coordinator-1, last active 3981689 ms ago
+2026-04-11 01:40:55,777 [INFO] consumer — <BrokerConnection node_id=coordinator-1 host=localhost:9092 <connected> [IPv4 ('127.0.0.1', 9092)]>: Closing connection. 
+2026-04-11 01:40:55,860 [INFO] consumer — <BrokerConnection node_id=coordinator-1 host=localhost:9092 <connecting> [IPv4 ('127.0.0.1', 9092)]>: connecting to localhost:9092 [('127.0.0.1', 9092) IPv4]
+2026-04-11 01:40:55,861 [INFO] consumer — <BrokerConnection node_id=coordinator-1 host=localhost:9092 <connecting> [IPv4 ('127.0.0.1', 9092)]>: Connection complete.
+2026-04-11 01:40:55,861 [INFO] consumer — Closing idle connection 1, last active 2678430 ms ago
+2026-04-11 01:40:55,861 [INFO] consumer — <BrokerConnection node_id=1 host=localhost:9092 <connected> [IPv4 ('127.0.0.1', 9092)]>: Closing connection. 
+2026-04-11 01:40:55,863 [INFO] consumer — <BrokerConnection node_id=1 host=localhost:9092 <connecting> [IPv4 ('127.0.0.1', 9092)]>: connecting to localhost:9092 [('127.0.0.1', 9092) IPv4]
+2026-04-11 01:40:55,864 [INFO] consumer — <BrokerConnection node_id=1 host=localhost:9092 <connecting> [IPv4 ('127.0.0.1', 9092)]>: Connection complete.
+2026-04-11 01:40:55,865 [WARNING] consumer — Heartbeat session expired, marking coordinator dead
+2026-04-11 01:40:55,866 [WARNING] consumer — Auto offset commit failed for group landing-zone-capture: NodeNotReadyError: coordinator-1
+2026-04-11 01:40:55,866 [WARNING] consumer — Marking the coordinator dead (node coordinator-1) for group landing-zone-capture: Heartbeat session expired.
+2026-04-11 01:40:55,870 [INFO] consumer — Group coordinator for landing-zone-capture is BrokerMetadata(nodeId='coordinator-1', host='localhost', port=9092, rack=None)
+2026-04-11 01:40:55,870 [INFO] consumer — Discovered coordinator coordinator-1 for group landing-zone-capture
+2026-04-11 04:16:48,176 [INFO] consumer — Closing idle connection coordinator-1, last active 8726986 ms ago
+2026-04-11 04:16:48,180 [INFO] consumer — <BrokerConnection node_id=coordinator-1 host=localhost:9092 <connected> [IPv4 ('127.0.0.1', 9092)]>: Closing connection. 
+2026-04-11 04:16:48,182 [WARNING] consumer — Heartbeat session expired, marking coordinator dead
+2026-04-11 04:16:48,183 [WARNING] consumer — Marking the coordinator dead (node coordinator-1) for group landing-zone-capture: Heartbeat session expired.
+2026-04-11 04:16:48,188 [INFO] consumer — Group coordinator for landing-zone-capture is BrokerMetadata(nodeId='coordinator-1', host='localhost', port=9092, rack=None)
+2026-04-11 04:16:48,189 [INFO] consumer — Discovered coordinator coordinator-1 for group landing-zone-capture
+2026-04-11 04:16:48,191 [INFO] consumer — <BrokerConnection node_id=coordinator-1 host=localhost:9092 <connecting> [IPv4 ('127.0.0.1', 9092)]>: connecting to localhost:9092 [('127.0.0.1', 9092) IPv4]
+2026-04-11 04:16:48,192 [INFO] consumer — <BrokerConnection node_id=coordinator-1 host=localhost:9092 <connecting> [IPv4 ('127.0.0.1', 9092)]>: Connection complete.
+2026-04-11 04:16:48,695 [WARNING] consumer — Auto offset commit failed for group landing-zone-capture: NodeNotReadyError: coordinator-1
+2026-04-11 05:19:42,859 [INFO] consumer — Closing idle connection coordinator-1, last active 3774056 ms ago
+2026-04-11 05:19:42,860 [INFO] consumer — <BrokerConnection node_id=coordinator-1 host=localhost:9092 <connected> [IPv4 ('127.0.0.1', 9092)]>: Closing connection. 
+2026-04-11 05:19:42,861 [WARNING] consumer — Heartbeat session expired, marking coordinator dead
+2026-04-11 05:19:42,861 [WARNING] consumer — Marking the coordinator dead (node coordinator-1) for group landing-zone-capture: Heartbeat session expired.
+2026-04-11 05:19:42,864 [INFO] consumer — Group coordinator for landing-zone-capture is BrokerMetadata(nodeId='coordinator-1', host='localhost', port=9092, rack=None)
+2026-04-11 05:19:42,864 [INFO] consumer — Discovered coordinator coordinator-1 for group landing-zone-capture
+2026-04-11 05:19:42,864 [INFO] consumer — <BrokerConnection node_id=coordinator-1 host=localhost:9092 <connecting> [IPv4 ('127.0.0.1', 9092)]>: connecting to localhost:9092 [('127.0.0.1', 9092) IPv4]
+2026-04-11 05:19:42,865 [INFO] consumer — <BrokerConnection node_id=coordinator-1 host=localhost:9092 <connecting> [IPv4 ('127.0.0.1', 9092)]>: Connection complete.
+2026-04-11 05:19:43,367 [WARNING] consumer — Auto offset commit failed for group landing-zone-capture: NodeNotReadyError: coordinator-1
+2026-04-11 06:35:54,129 [INFO] consumer — Closing idle connection coordinator-1, last active 4568258 ms ago
+2026-04-11 06:35:54,130 [INFO] consumer — <BrokerConnection node_id=coordinator-1 host=localhost:9092 <connected> [IPv4 ('127.0.0.1', 9092)]>: Closing connection. 
+2026-04-11 06:35:54,131 [WARNING] consumer — Heartbeat session expired, marking coordinator dead
+2026-04-11 06:35:54,131 [WARNING] consumer — Marking the coordinator dead (node coordinator-1) for group landing-zone-capture: Heartbeat session expired.
+2026-04-11 06:35:54,145 [INFO] consumer — Group coordinator for landing-zone-capture is BrokerMetadata(nodeId='coordinator-1', host='localhost', port=9092, rack=None)
+2026-04-11 06:35:54,146 [INFO] consumer — Discovered coordinator coordinator-1 for group landing-zone-capture
+2026-04-11 06:35:54,147 [INFO] consumer — <BrokerConnection node_id=coordinator-1 host=localhost:9092 <connecting> [IPv4 ('127.0.0.1', 9092)]>: connecting to localhost:9092 [('127.0.0.1', 9092) IPv4]
+2026-04-11 06:35:54,147 [INFO] consumer — <BrokerConnection node_id=coordinator-1 host=localhost:9092 <connecting> [IPv4 ('127.0.0.1', 9092)]>: Connection complete.
+2026-04-11 06:35:54,649 [WARNING] consumer — Auto offset commit failed for group landing-zone-capture: NodeNotReadyError: coordinator-1
+2026-04-11 10:36:11,666 [INFO] consumer — Closing idle connection coordinator-1, last active 14288309 ms ago
+2026-04-11 10:36:11,666 [INFO] consumer — <BrokerConnection node_id=coordinator-1 host=localhost:9092 <connected> [IPv4 ('127.0.0.1', 9092)]>: Closing connection. 
+2026-04-11 10:36:11,667 [WARNING] consumer — Heartbeat session expired, marking coordinator dead
+2026-04-11 10:36:11,668 [WARNING] consumer — Marking the coordinator dead (node coordinator-1) for group landing-zone-capture: Heartbeat session expired.
+2026-04-11 10:36:11,672 [INFO] consumer — Group coordinator for landing-zone-capture is BrokerMetadata(nodeId='coordinator-1', host='localhost', port=9092, rack=None)
+2026-04-11 10:36:11,672 [INFO] consumer — Discovered coordinator coordinator-1 for group landing-zone-capture
+2026-04-11 10:36:11,672 [INFO] consumer — <BrokerConnection node_id=coordinator-1 host=localhost:9092 <connecting> [IPv4 ('127.0.0.1', 9092)]>: connecting to localhost:9092 [('127.0.0.1', 9092) IPv4]
+2026-04-11 10:36:11,673 [INFO] consumer — <BrokerConnection node_id=coordinator-1 host=localhost:9092 <connecting> [IPv4 ('127.0.0.1', 9092)]>: Connection complete.
+2026-04-11 10:36:12,175 [WARNING] consumer — Auto offset commit failed for group landing-zone-capture: NodeNotReadyError: coordinator-1
+2026-04-11 10:45:40,041 [WARNING] consumer — Heartbeat session expired, marking coordinator dead
+2026-04-11 10:45:40,042 [WARNING] consumer — Marking the coordinator dead (node coordinator-1) for group landing-zone-capture: Heartbeat session expired.
+2026-04-11 10:45:40,045 [INFO] consumer — Group coordinator for landing-zone-capture is BrokerMetadata(nodeId='coordinator-1', host='localhost', port=9092, rack=None)
+2026-04-11 10:45:40,045 [INFO] consumer — Discovered coordinator coordinator-1 for group landing-zone-capture

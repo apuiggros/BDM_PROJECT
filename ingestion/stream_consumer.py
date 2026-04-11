@@ -27,7 +27,7 @@ MINIO_ACCESS_KEY = os.getenv("MINIO_ACCESS_KEY", "admin")
 MINIO_SECRET_KEY = os.getenv("MINIO_SECRET_KEY", "password")
 MINIO_BUCKET     = os.getenv("MINIO_BUCKET", "landing-zone")
 
-S3_STREAM_PREFIX = "podcasts/raw_stream"
+S3_STREAM_PREFIX = "hot_path/raw_stream"
 
 # ─── MinIO / S3 Client ────────────────────────────────────────────────────────
 def get_minio_client():
