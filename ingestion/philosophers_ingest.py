@@ -176,7 +176,6 @@ def run() -> None:
     BASE_DOMAIN = "https://philosophersapi.com"
     
     for philo in philosophers:
-        slug = philo["name"].lower().replace(" ", "_")
         images_dict = philo.get("images") or {}
         
         for category, urls in images_dict.items():

@@ -135,8 +135,12 @@ def convert_gutenberg_metadata_to_delta(client):
             for obj in page.get('Contents', []):
                 if obj['Key'].endswith('_catalog.json'):
                     resp = client.get_object(Bucket=MINIO_BUCKET, Key=obj['Key'])
-                    item = json.loads(resp['Body'].read().decode('utf-8'))
-                    all_data.append(item)
+                    items = json.loads(resp['Body'].read().decode('utf-8'))
+                    # Each catalog is a list of books — extend, not append
+                    if isinstance(items, list):
+                        all_data.extend(items)
+                    else:
+                        all_data.append(items)
         
         if all_data:
             df = pd.json_normalize(all_data)

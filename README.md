@@ -22,14 +22,14 @@
 
 ## 🎯 End Goal & Motivation
 
-The ultimate objective of this project is to power a **multimodal AI system capable of generating realistic, podcast-style interviews with famous historical figures** — starting with classical philosophers.
+The ultimate objective of this project is to power a **multimodal AI system capable of generating realistic, podcast-style interviews with famous historical figures** — spanning philosophy, science, and literature.
 
-The challenge is that such an AI needs to answer a deceptively complex question: *"How would Immanuel Kant react to today's news on artificial intelligence?"*. To answer this credibly, the AI needs at least four distinct categories of raw knowledge:
+The challenge is that such an AI needs to answer a deceptively complex question: *"How would Immanuel Kant react to today's news on artificial intelligence?"*. To answer this credibly, the AI needs at least six distinct categories of raw knowledge:
 
 | Pillar | What the AI Learns | Where We Get It |
 |---|---|---|
 | **Core Biographical Facts** | Names, schools of thought, dates, concepts, portraits | Philosophers REST API & Wikipedia |
-| **Authoritative Writings** | The actual vocabulary, reasoning style, and syntax of the philosopher | Project Gutenberg (Public Domain books) |
+| **Authoritative Writings** | The actual vocabulary, reasoning style, and syntax of the figure | Project Gutenberg (Public Domain books) |
 | **Verified Quotes** | Authentic historical quotes and citations | Wikiquote MediaWiki API |
 | **Community Q&A** | Modern philosophical debates, clarifications, and community Q&A | Philosophy Stack Exchange API |
 | **Conversational Dynamics** | How an interview or debate flows — tone, pacing, turn-taking | Podcast Audio (iTunes RSS) |
@@ -42,6 +42,8 @@ This P1 deliverable focuses on **Phase 1**: Building and automating a fully cont
 ## 🏗️ Architecture Overview
 
 The pipeline follows a **Registry-Driven, Micro-Ingestion architecture** organized around a central `character_registry.py` — a single source of truth for all target entities. Every ingestion script reads from this registry, ensuring that adding a new historical figure to the pipeline only requires editing one file.
+
+The pipeline currently targets **9 historical figures** across three domains (philosophy, science, literature), ingesting data from **7 external sources** plus a Kafka-based streaming pipeline.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -61,14 +63,14 @@ The pipeline follows a **Registry-Driven, Micro-Ingestion architecture** organiz
 │  │ Biography Sums   │   │ Quotes/Facts  │      │ Q&A History   │         │
 │  └────────┬─────────┘   └────────┬──────┘      └────────┬──────┘         │
 │           │                      │                      │                   │
-│  ┌────────▼─────────┐   ┌────────▼─────────┐      ┌────────▼─────────┐         │
-│  │ gnews.io         │   │ iTunes API       │      │ pipeline_complete│         │
-│  │ Top Headlines    │   │ Podcast Audio    │      │ (dummy summary)  │         │
-│  └────────┬─────────┘   └────────┬─────────┘      └────────▲─────────┘         │
-└───────────┼─────────────────────┼──────────────────────┼───────────────────┘
-            │                     │                      │
-┌───────────▼─────────────────────▼──────────────────────▼───────────────────┐
-│                    ORCHESTRATION LAYER (Docker Container)                   │
+│  ┌────────▼─────────┐                                                      │
+│  │ gnews.io         │                                                      │
+│  │ Top Headlines    │                                                      │
+│  └────────┬─────────┘                                                      │
+└───────────┼─────────────────────────────────────────────────────────────────┘
+            │
+┌───────────▼─────────────────────────────────────────────────────────────────┐
+│                    ORCHESTRATION LAYER (Docker Containers)                   │
 │                                                                             │
 │                         Apache Airflow 2.9.0                                │
 │                      (LocalExecutor | PostgreSQL Backend)                   │
@@ -133,7 +135,7 @@ The pipeline follows a **Registry-Driven, Micro-Ingestion architecture** organiz
 
 ## 🐳 Infrastructure Deep Dive
 
-The entire infrastructure is defined in `docker-compose.yml` and spins up **5 containers**:
+The entire infrastructure is defined in `docker-compose.yml` and spins up **8 containers**:
 
 ### `minio` — The Landing Zone
 - **Image:** `minio/minio:latest`
@@ -156,7 +158,7 @@ The entire infrastructure is defined in `docker-compose.yml` and spins up **5 co
 ### `airflow-webserver` — The Control Panel
 - **Image:** `apache/airflow:2.9.0`
 - **Role:** The Airflow Web UI for monitoring, triggering, and debugging DAG runs.
-- **Port:** `8081` on your host maps to `8080` inside the container.
+- **Port:** `8080` on your host.
 - **Startup Sequence:** Runs `airflow db migrate` to apply schema migrations, then creates the default `admin` user, then starts the server.
 - **Dependencies:** Both `minio` (healthy) and `postgres` (healthy) must be ready before this starts.
 
@@ -169,7 +171,7 @@ The entire infrastructure is defined in `docker-compose.yml` and spins up **5 co
 - **Images:** `confluentinc/cp-kafka`, `confluentinc/cp-zookeeper`
 - **Role:** Handles real-time events and streaming data.
 - **Topic:** `character-mentions` — captures simulated real-time mentions of historical figures across the web.
-- **Consumer:** Flushes stream data into a **Temporal Landing Zone** in MinIO.
+- **Consumer:** Flushes stream data into the hot-path Landing Zone prefix in MinIO (`hot_path/raw_stream/`).
 
 ### Kafka UI — Stream Monitoring
 - **URL:** [http://localhost:8085](http://localhost:8085)
@@ -180,7 +182,7 @@ Both Airflow services share a base configuration defined via the YAML anchor `x-
 - `AIRFLOW__CORE__EXECUTOR=LocalExecutor` — Enables true parallelism within a single machine.
 - `AIRFLOW__DATABASE__SQL_ALCHEMY_CONN` — Points to the PostgreSQL container.
 - **Volume Mounts:** `./orchestration/` → `/opt/airflow/dags/` and `./ingestion/` → `/opt/airflow/ingestion/`. This means every file you edit locally is instantly picked up by the running containers — **no rebuilds required**.
-- **Dynamic pip installs:** `_PIP_ADDITIONAL_REQUIREMENTS=pandas boto3 python-dotenv deltalake kafka-python-ng` installs these packages at container startup.
+- **Dynamic pip installs:** `_PIP_ADDITIONAL_REQUIREMENTS=pandas boto3 python-dotenv deltalake` installs these packages at container startup.
 - **`.env` file injection:** `env_file: - .env` forwards your `.env` secrets directly into both Airflow containers.
 
 ---
@@ -202,30 +204,30 @@ All scripts live in `ingestion/` and follow a strict, consistent design pattern:
 
 **What it does:**
 1. Fetches the entire catalog of 114 philosophers in a single flat JSON list (`GET /api/philosophers`).
-2. Filters to only the 5 target figures defined in `philosopher_registry.py`.
+2. Filters to only the 5 philosophy-domain target figures defined in `character_registry.py`.
 3. Enriches each record with academic deep-links (`stanford_sep`, `internet_iep`, `wikipedia` URLs) for future enrichment tasks.
-4. Uploads the filtered JSON to `s3://landing-zone/philosophers_api/raw_json/philosophers_catalog.json`.
+4. Uploads the filtered JSON to `s3://landing-zone/philosophers_api/raw_json/philosophy/philosophers_catalog.json`.
 5. Iterates through all image URLs in the `images` dictionary for each philosopher and downloads every portrait, thumbnail, and illustration.
 6. Uses an idempotency check per image — already downloaded portraits are skipped.
 
-**Storage path:** `s3://landing-zone/philosophers_api/raw_images/{slug}/{category}/{key}.jpg`
+**Storage path:** `s3://landing-zone/philosophers_api/raw_images/{domain}/{slug}/{category}/{key}.jpg`
 
 ---
 
-### 2. `gutenberg_ingest.py` — Canonical Philosophical Texts
+### 2. `gutenberg_ingest.py` — Canonical Historical Texts
 **Source:** [gutendex.com](https://gutendex.com/) — A community REST API wrapping Project Gutenberg's catalog of public domain books.
 
 **What it does:**
-1. Iterates through every philosopher in `philosopher_registry.py`.
-2. Calls the Gutendex `search` endpoint with the philosopher's name.
-3. Filters results to only books where the philosopher is confirmed as an **author** (not just mentioned in the title) by matching the author slug in the response.
+1. Iterates through every figure in `character_registry.py` (all domains).
+2. Calls the Gutendex `search` endpoint with the figure's name.
+3. Filters results to only books where the figure is confirmed as an **author** (not just mentioned in the title) by matching the author slug in the response.
 4. Uploads a `{slug}_catalog.json` provenance record listing all matched books.
 5. Resolves the best plain-text download URL from the `formats` dictionary (UTF-8 → ASCII → any `plain` type, in order of preference).
 6. Downloads each `.txt` file and uploads it raw to MinIO.
 7. Enforces a **1.5-second mandatory delay** between downloads to comply with Project Gutenberg's robot policy and avoid IP banning.
 8. Idempotency: Skips books already uploaded by checking for the S3 key first.
 
-**Storage path:** `s3://landing-zone/gutenberg/raw_text/{slug}_{book_id}_{title}.txt`
+**Storage path:** `s3://landing-zone/gutenberg/raw_text/{domain}/{slug}_{book_id}_{title}.txt`
 
 ---
 
@@ -234,7 +236,7 @@ All scripts live in `ingestion/` and follow a strict, consistent design pattern:
 
 **What it does:**
 1. Uses a **Discovery-Based** approach to find unstructured audio examples of human conversation.
-2. Queries the iTunes Search API for broad topics (configured in `TARGET_TOPICS`, e.g., "philosophy").
+2. Queries the iTunes Search API for broad topics (configured in `TARGET_TOPICS`).
 3. Discovers the top-ranking podcast channels for those topics.
 4. Parses the RSS feeds of those channels to find the latest episodes.
 5. Downloads the `.mp3` or `.m4a` audio files and uploads them raw to MinIO.
@@ -249,9 +251,9 @@ All scripts live in `ingestion/` and follow a strict, consistent design pattern:
 **Source:** Wikipedia REST API (`en.wikipedia.org/api/rest_v1/page/summary`).
 
 **What it does:**
-1. Iterates through **every figure** in the `character_registry.py`.
+1. Iterates through **every figure** in `character_registry.py` (all domains).
 2. Fetches a structured biography summary, including a plain-text extract and normalized metadata.
-3. Organizes files strictly by domain subdirectory (philosophy, science, etc.).
+3. Organizes files strictly by domain subdirectory (philosophy, science, literature).
 4. This script ensures that even if other sources fail, every historical figure has a baseline of factual knowledge.
 
 **Storage path:** `s3://landing-zone/wikipedia/raw_json/{domain}/{slug}_wikipedia.json`
@@ -262,7 +264,7 @@ All scripts live in `ingestion/` and follow a strict, consistent design pattern:
 **Source:** Wikiquote MediaWiki API (`en.wikiquote.org/w/api.php`).
 
 **What it does:**
-1. Iterates through every figure in the `character_registry.py`.
+1. Iterates through every figure in `character_registry.py`.
 2. Fetches verified quotes and citations using the `wikidata_label` as the page title.
 3. Provides the "voice" of the historical figure through their own historically attributed words.
 4. **Idempotency:** Applies a `head_object` check to avoid redundant API hits for static quotes.
@@ -293,9 +295,11 @@ All scripts live in `ingestion/` and follow a strict, consistent design pattern:
 3. Tags each article with its source category (`_source_category` field) for easier filtering in downstream tasks.
 4. Aggregates all articles from all categories into a single list.
 5. Uploads a single daily snapshot file to MinIO, timestamped by date.
-6. **Idempotency via daily overwrite:** Files are named `news_snapshot_YYYYMMDD.json`. If the DAG fires twice in one day, it safely overwrites the existing file. This prevents data bloat while ensuring the latest articles are always captured.
+6. **Idempotency via daily overwrite:** Files are named `news_snapshot_YYYYMMDD.json`. If the DAG fires twice in one day, it safely overwrites the existing file.
 
 **Storage path:** `s3://landing-zone/news_api/raw_json/news_snapshot_{YYYYMMDD}.json`
+
+> **Note:** The free GNews tier allows 100 requests/day, which is more than sufficient for this daily batch pipeline.
 
 ---
 
@@ -305,8 +309,10 @@ All scripts live in `ingestion/` and follow a strict, consistent design pattern:
 **What it does:**
 1. **Producer:** Generates a real-time stream of JSON messages simulating mentions of characters in historical/academic context with sentiment scores.
 2. **Kafka:** Broker manages the `character-mentions` topic.
-3. **Consumer:** A background process that listens to the stream and flushes messages to MinIO once a buffer size is reached.
+3. **Consumer:** A background process that listens to the stream and flushes messages to MinIO once a buffer size is reached. On shutdown, remaining buffered messages are flushed to prevent data loss.
 4. This implements the **Streaming Ingestion** requirement of the Data Lakehouse architecture.
+
+The streaming pipeline operates continuously and independently of the daily DAG schedule, as batch orchestration is incompatible with long-running consumer processes.
 
 **Storage path:** `s3://landing-zone/hot_path/raw_stream/mentions_{timestamp}.json`
 
@@ -316,40 +322,44 @@ All scripts live in `ingestion/` and follow a strict, consistent design pattern:
 **Role:** Converts raw semi-structured JSON objects from all sources into a structured **Delta Lake** format.
 
 **What it does:**
-1. **Unified Aggregation:** Instead of hundreds of individual JSON files, it creates 5 consolidated "Master Tables."
+1. **Unified Aggregation:** Instead of hundreds of individual JSON files, it creates 7 consolidated "Master Tables."
 2. **Delta Tables Created:**
    - `philosophers`: All core metadata from the Philosophers API.
-   - `news_headlines`: A history of all daily news snapshots.
+   - `news_headlines`: A history of all daily news snapshots (append mode).
    - `wikipedia_biographies`: Factual summaries (biographies) for all characters.
    - `wikiquote_quotes`: Aggregated verified quotes and citations.
-   - `philosophy_se_questions`: Archive of Stack Exchange Q&A history.
+   - `philosophy_se_questions`: Archive of Stack Exchange Q&A history (append mode).
    - `gutenberg_library`: A searchable catalog of every text file available.
    - `podcast_episodes`: An index of all audio files with their durations and descriptions.
 3. **Big Data Features:** Adds **Time Travel**, **Schema Enforcement**, and high-speed **Parquet** storage to the Bronze Layer.
 
 **Storage path:** `s3://landing-zone/bronze_tables/{table_name}/`
 
-> **Note:** The free GNews tier allows 100 requests/day, which is more than sufficient for this daily batch pipeline.
-
 ---
 
-### 6. `character_registry.py` — The Single Source of Truth
+### `character_registry.py` — The Single Source of Truth
 This is **not** an ingestion script — it is the central configuration that all ingestion scripts import from.
 
 It defines a `TARGET_FIGURES` list where each historical figure is a dict with all search terms needed for each source:
 ```python
 {
-    "api_name": "Friedrich Nietzsche",      # Exact match for philosophersapi.com
-    "gutenberg_search": "Nietzsche",        # Keyword for Gutendex search
-    "gutenberg_author_slug": "nietzsche",   # For author attribution filtering
-    "kaggle_author": "Friedrich Nietzsche", # Reserved for future Kaggle integration
-    "wikidata_label": "Friedrich Nietzsche",# Reserved for future Wikidata SPARQL
+    "domain":                "philosophy",
+    "api_name":              "Friedrich Nietzsche",
+    "gutenberg_search":      "Nietzsche",
+    "gutenberg_author_slug": "nietzsche",
+    "wikidata_label":        "Friedrich Nietzsche",
 }
 ```
 
 **To add a new figure (philosopher, scientist, author) to the entire pipeline, you only edit this one file.** All ingestion scripts pick up the change automatically.
 
-**Current targets:** Plato, René Descartes, Immanuel Kant, Georg Wilhelm Friedrich Hegel, Friedrich Nietzsche.
+**Current targets (9 figures across 3 domains):**
+
+| Domain | Figures |
+|---|---|
+| Philosophy | Plato, René Descartes, Immanuel Kant, Georg Wilhelm Friedrich Hegel, Friedrich Nietzsche |
+| Science | Albert Einstein, Charles Darwin |
+| Literature | Oscar Wilde, Mark Twain |
 
 ---
 
@@ -393,35 +403,45 @@ landing_zone/
 └── landing-zone/                          ← MinIO bucket root
     ├── philosophers_api/
     │   ├── raw_json/
-    │   │   └── philosophers_catalog.json        ← All 5 philosopher records + academic links
+    │   │   └── philosophy/
+    │   │       └── philosophers_catalog.json    ← All 5 philosopher records + academic links
     │   └── raw_images/
-    │       ├── plato/
-    │       │   ├── thumbnails/thumb.jpg
-    │       │   └── illustrations/portrait.jpg
-    │       ├── descartes/
-    │       ├── kant/
-    │       ├── hegel/
-    │       └── nietzsche/
+    │       ├── philosophy/
+    │       │   ├── plato/
+    │       │   │   ├── thumbnails/thumb.jpg
+    │       │   │   └── illustrations/portrait.jpg
+    │       │   ├── descartes/
+    │       │   ├── kant/
+    │       │   ├── hegel/
+    │       │   └── nietzsche/
     ├── gutenberg/
     │   └── raw_text/
-    │       └── philosophy/
-    │           ├── plato_catalog.json               ← Provenance metadata
-    │           ├── plato_1497_The_Republic.txt
-    │           ├── plato_1616_Symposium.txt
-    │       └── science/
-    │           └── einstein_catalog.json
+    │       ├── philosophy/
+    │       │   ├── plato_catalog.json               ← Provenance metadata
+    │       │   ├── plato_1497_The_Republic.txt
+    │       │   └── plato_1616_Symposium.txt
+    │       ├── science/
+    │       │   ├── darwin_catalog.json
+    │       │   └── einstein_catalog.json
+    │       └── literature/
+    │           ├── wilde_catalog.json
+    │           └── twain_catalog.json
     ├── wikipedia/
     │   └── raw_json/
     │       ├── philosophy/
     │       │   └── plato_wikipedia.json
-    │       └── science/
-    │           └── einstein_wikipedia.json
+    │       ├── science/
+    │       │   └── einstein_wikipedia.json
+    │       └── literature/
+    │           └── wilde_wikipedia.json
     ├── wikiquote/
     │   └── raw_json/
     │       ├── philosophy/
     │       │   └── plato_wikiquote.json
-    │       └── science/
-    │           └── einstein_wikiquote.json
+    │       ├── science/
+    │       │   └── einstein_wikiquote.json
+    │       └── literature/
+    │           └── wilde_wikiquote.json
     ├── philosophy_se/
     │   └── raw_json/
     │       └── philosophy_se_snapshot_20260411.json
@@ -436,9 +456,17 @@ landing_zone/
     │   └── raw_json/
     │       ├── news_snapshot_20260408.json       ← Daily trending headlines snapshot
     │       └── news_snapshot_20260409.json
-    └── hot_path/
-        └── raw_stream/
-            └── mentions_{timestamp}.json         ← Real-time Kafka stream flushes
+    ├── hot_path/
+    │   └── raw_stream/
+    │       └── mentions_{timestamp}.json         ← Real-time Kafka stream flushes
+    └── bronze_tables/                            ← DELTA LAKE (ACID Tables)
+        ├── philosophers/
+        ├── news_headlines/
+        ├── wikipedia_biographies/
+        ├── wikiquote_quotes/
+        ├── philosophy_se_questions/
+        ├── gutenberg_library/
+        └── podcast_episodes/
 ```
 
 ---
@@ -447,13 +475,13 @@ landing_zone/
 
 ```text
 P1/
-├── docker-compose.yml             # Full 5-container stack definition
+├── docker-compose.yml             # Full 8-container stack definition
 ├── requirements.txt               # Python deps for local dev & Airflow
 ├── .env                           # Secrets & configuration (NOT committed to git)
 ├── .gitignore                     # Excludes .env, .venv, landing_zone data, etc.
 │
 ├── ingestion/                     # Core ingestion scripts
-│   ├── character_registry.py      # ← Single source of truth for target entities
+│   ├── character_registry.py      # ← Single source of truth for all 9 target entities
 │   ├── philosophers_ingest.py     # Philosophers API → JSON + Images → MinIO
 │   ├── gutenberg_ingest.py        # Project Gutenberg → Plain Text Books → MinIO
 │   ├── podcast_audio_ingest.py    # iTunes RSS → Audio .mp3 → MinIO
@@ -466,12 +494,10 @@ P1/
 │   └── metadata_to_delta.py       # JSON → Delta Lake (Lakehouse conversion)
 │
 ├── orchestration/                 # Airflow DAG definitions
-│   └── bdm_p1_pipeline_dag.py     # Daily batch DAG (4 parallel tasks)
+│   └── bdm_p1_pipeline_dag.py     # Daily batch DAG (7 parallel tasks + delta conversion)
 │
-├── landing_zone/                  # Host-side persistent data directory
-│   └── landing-zone/              # Mirrors the MinIO bucket structure
-│
-└── PLAYGROUND/                    # Experimental scripts & API exploration
+└── landing_zone/                  # Host-side persistent data directory
+    └── landing-zone/              # Mirrors the MinIO bucket structure
 ```
 
 ---
@@ -490,15 +516,18 @@ P1/
 |---|---|---|
 | GNews API | `NEWS_API_KEY` | Register at [gnews.io](https://gnews.io/) → Free tier gives 100 req/day |
 
-> The Philosophers API and Project Gutenberg/Gutendex are completely **public and require no authentication**.
+> The Philosophers API, Project Gutenberg/Gutendex, Wikipedia, Wikiquote, and Stack Exchange are completely **public and require no authentication**.
 
 ### Python Dependencies (`requirements.txt`)
 ```
 requests>=2.31.0             # HTTP client for all API calls
+pandas>=2.0.0                # Data analysis and manipulation
 boto3>=1.34.0                # AWS SDK — used to talk to MinIO (S3-compatible)
 python-dotenv>=1.0.0         # Loads .env into os.environ
 apache-airflow>=2.9.0        # Workflow orchestration
-deltalake>=0.17.0            # Delta Lake (future-proof for Trusted Zone writes)
+deltalake>=0.17.0            # Delta Lake format support
+pyarrow>=15.0.0              # Parquet storage underpinning
+kafka-python-ng>=2.2.0       # Kafka client (Producer/Consumer)
 ```
 
 ---
@@ -522,6 +551,9 @@ MINIO_ACCESS_KEY=admin
 MINIO_SECRET_KEY=password
 MINIO_BUCKET=landing-zone
 
+# ─── Kafka ──────────────────────────────────────────────────────────────────
+KAFKA_BOOTSTRAP_SERVERS=localhost:9092
+
 # ─── External API Keys ─────────────────────────────────────────────────────
 NEWS_API_KEY=YOUR_GNEWS_API_KEY_HERE
 ```
@@ -537,6 +569,7 @@ This single command boots:
 - PostgreSQL (Airflow metadata DB)
 - MinIO (object store + auto-creates the `landing-zone` bucket)
 - Apache Airflow Webserver & Scheduler
+- Zookeeper, Kafka & Kafka UI (hot-path streaming)
 
 > 🕐 **First boot takes ~60-90 seconds** for the Airflow Webserver to run `db migrate`, create the admin user, and pass its health check before the Scheduler starts.
 
@@ -544,21 +577,22 @@ You can watch the health in real time with:
 ```bash
 docker compose ps
 ```
-All 5 services should show `healthy` or `exited (0)` (for `minio-init`, which finishes immediately after creating the bucket).
+All 8 services should show `healthy` or `exited (0)` (for `minio-init`, which finishes immediately after creating the bucket).
 
 ### Step 4: Access the UIs
 
 | Service | URL | Credentials |
 |---|---|---|
-| Airflow Web UI | [http://localhost:8081](http://localhost:8081) | user: `admin` / pass: `admin` |
+| Airflow Web UI | [http://localhost:8080](http://localhost:8080) | user: `admin` / pass: `admin` |
 | MinIO Console | [http://localhost:9001](http://localhost:9001) | user: `admin` / pass: `password` |
+| Kafka UI | [http://localhost:8085](http://localhost:8085) | (no auth required) |
 
 ---
 
 ## 🔄 Running the Pipeline
 
 ### Via the Airflow UI (Automated)
-1. Open [http://localhost:8081](http://localhost:8081) and log in.
+1. Open [http://localhost:8080](http://localhost:8080) and log in.
 2. Find the DAG `bdm_p1_cold_path_ingestion` in the list.
 3. **Unpause it** using the toggle on the left side.
 4. Click the **▶ Run** button (the play icon) to trigger a manual execution.
@@ -586,15 +620,22 @@ source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 # 2. Install dependencies
 pip install -r requirements.txt
 
-# 3. Make sure your containers are running (MinIO must be up)
+# 3. Make sure your containers are running (MinIO + Kafka must be up)
 docker compose up -d
 
-# 4. Run the target script directly
+# 4. Run cold-path scripts directly
 python ingestion/philosophers_ingest.py
 python ingestion/gutenberg_ingest.py
-python ingestion/podcast_audio_ingest.py
 python ingestion/wikipedia_ingest.py
+python ingestion/wikiquote_ingest.py
+python ingestion/philosophyse_ingest.py
 python ingestion/news_ingest.py
+python ingestion/podcast_audio_ingest.py
+python ingestion/metadata_to_delta.py
+
+# 5. Run hot-path scripts (in separate terminals)
+python ingestion/stream_producer.py
+python ingestion/stream_consumer.py
 ```
 
 After a successful run, you can verify the files were created by:
@@ -611,18 +652,34 @@ MinIO is a drop-in S3-compatible replacement. Every single `boto3` call in this 
 ### Why PostgreSQL for Airflow instead of SQLite?
 The default SQLite backend creates file-level locks that cause deadlocks when the `LocalExecutor` tries to run multiple tasks in parallel. PostgreSQL is the industry standard for production Airflow deployments and resolves all parallelism issues.
 
-### Why the `philosopher_registry.py` pattern?
+### Why the `character_registry.py` pattern?
 Rather than hardcoding names differently in each script, every search term for every source is centralized in one dictionary. Adding a new figure to the pipeline is a **single-line edit** to the registry file — all scripts automatically pick it up on the next run.
 
-### Why Podcasts instead of downloading Youtube?
+### Why Podcasts instead of downloading YouTube?
 Audio files provide the raw conversational data needed for future voice-cloning and tone-analysis steps. While YouTube transcripts are pure text, podcasts provide both the content and the acoustic performance, making the AI's future generation more "human."
 
 ### Why Top Headlines news instead of keyword search?
-Our AI does not need to know specific facts about AI ethics covered in academic papers—that is what the Philosophers API and Gutenberg cover. What it needs for the interview format is **whatever people are currently talking about** so it can simulate a real-time reaction. Top headlines from `world`, `technology`, and `science` categories provide this ambient awareness of the zeitgeist.
+Our AI does not need to know specific facts about AI ethics covered in academic papers — that is what the Philosophers API and Gutenberg cover. What it needs for the interview format is **whatever people are currently talking about** so it can simulate a real-time reaction. Top headlines from `world`, `technology`, and `science` categories provide this ambient awareness of the zeitgeist.
+
+### Why is the Kafka streaming pipeline outside the Airflow DAG?
+The hot-path producer and consumer are long-running processes that operate continuously, while Airflow is designed for batch tasks with defined start and end points. These are architecturally separate concerns: the DAG handles scheduled daily ingestion, while Kafka handles real-time event capture independently.
 
 ### Idempotency Strategy
 Each script uses a different idempotency model appropriate for its data type:
-- **Images & Transcripts:** `head_object()` pre-check — file is skipped entirely if it exists.
-- **News snapshots:** Daily filename overwrite — the latest run always wins for the current day.
+- **Images, Books, Audio & Quotes:** `head_object()` pre-check — file is skipped entirely if it exists.
+- **News & Stack Exchange snapshots:** Daily filename overwrite — the latest run always wins for the current day.
 - **Philosopher metadata catalog:** Always overwritten — ensures the latest API truth is stored.
-- **Gutenberg books:** `head_object()` pre-check — books do not change, so once downloaded they never need refreshing.
+- **Wikipedia biographies:** Always overwritten — biographies can be edited; daily refresh is cheap.
+
+### Data Volume Summary
+
+| Source | Volume per run | Growth rate |
+|---|---|---|
+| Gutenberg texts | ~600 MB | Static (public domain, immutable) |
+| Podcast audio | ~2 GB (40+ hours) | Per discovery run |
+| News snapshots | ~150 KB/day | ~4.5 MB/month |
+| Wikipedia biographies | ~100 KB | Static (daily overwrite) |
+| Wikiquote quotes | ~50 KB | Static (idempotent) |
+| Philosophy SE Q&A | ~2 MB/snapshot | ~60 MB/month (append mode) |
+| Philosophers API | ~30 KB | Static (daily overwrite) |
+| Hot path stream | Variable | Continuous (buffer-and-flush) |

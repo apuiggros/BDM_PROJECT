@@ -45,6 +45,25 @@ def ensure_bucket(client, bucket):
     if bucket not in existing:
         client.create_bucket(Bucket=bucket)
 
+
+def flush_buffer(client, buffer):
+    """Flush the current buffer to MinIO and return an empty list."""
+    if not buffer:
+        return []
+    timestamp_str = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    obj_key = f"{S3_STREAM_PREFIX}/mentions_{timestamp_str}.json"
+
+    payload = json.dumps(buffer, indent=2).encode('utf-8')
+    client.put_object(
+        Bucket=MINIO_BUCKET,
+        Key=obj_key,
+        Body=payload,
+        ContentType="application/json"
+    )
+    logger.info("  ✓ Flushed %d messages to s3://%s/%s", len(buffer), MINIO_BUCKET, obj_key)
+    return []
+
+
 # ─── Main Logic ───────────────────────────────────────────────────────────────
 def run_consumer():
     client = get_minio_client()
@@ -85,23 +104,15 @@ def run_consumer():
             buffer.append(mention)
             
             if len(buffer) >= MAX_BUFFER_SIZE:
-                # Flush to S3
-                timestamp_str = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-                obj_key = f"{S3_STREAM_PREFIX}/mentions_{timestamp_str}.json"
-                
-                payload = json.dumps(buffer, indent=2).encode('utf-8')
-                client.put_object(
-                    Bucket=MINIO_BUCKET,
-                    Key=obj_key,
-                    Body=payload,
-                    ContentType="application/json"
-                )
-                logger.info("  ✓ Flushed %d messages to s3://%s/%s", len(buffer), MINIO_BUCKET, obj_key)
-                buffer = []
+                buffer = flush_buffer(client, buffer)
                 
     except KeyboardInterrupt:
         logger.info("Shutting down consumer...")
     finally:
+        # Flush any remaining messages in the buffer before exiting
+        if buffer:
+            logger.info("Flushing remaining %d messages before shutdown...", len(buffer))
+            flush_buffer(client, buffer)
         consumer.close()
 
 if __name__ == "__main__":
