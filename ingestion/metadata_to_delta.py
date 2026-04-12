@@ -170,6 +170,70 @@ def convert_podcast_metadata_to_delta(client):
     except Exception as e:
         logger.error("  ✗ Failed to convert podcasts: %s", e)
 
+def convert_wikiquote_to_delta(client):
+    """Aggregates all Wikiquote JSON files into a single Delta table."""
+    logger.info("Converting Wikiquote Quotes to Delta...")
+    prefix = "wikiquote/raw_json/"
+    
+    try:
+        paginator = client.get_paginator('list_objects_v2')
+        all_data = []
+        
+        for page in paginator.paginate(Bucket=MINIO_BUCKET, Prefix=prefix):
+            for obj in page.get('Contents', []):
+                if obj['Key'].endswith('_wikiquote.json'):
+                    resp = client.get_object(Bucket=MINIO_BUCKET, Key=obj['Key'])
+                    resp_data = json.loads(resp['Body'].read().decode('utf-8'))
+                    
+                    pages = resp_data.get("query", {}).get("pages", {})
+                    if not pages:
+                        continue
+                    
+                    # MediaWiki returns pages as a dict with numeric keys, usually just one
+                    page_val = next(iter(pages.values()))
+                    
+                    # Extract domain from path: wikiquote/raw_json/{domain}/...
+                    parts = obj['Key'].split('/')
+                    page_val['_domain'] = parts[2]
+                    
+                    all_data.append(page_val)
+        
+        if all_data:
+            df = pd.json_normalize(all_data)
+            table_path = f"{DELTA_ROOT}/wikiquote_quotes"
+            write_deltalake(table_path, df, mode="overwrite")
+            logger.info("  ✓ Delta table updated: %s (%d records)", table_path, len(all_data))
+    except Exception as e:
+        logger.error("  ✗ Failed to convert wikiquote: %s", e)
+
+def convert_philosophy_se_to_delta(client):
+    """Converts the latest Philosophy SE snapshot into a Delta table."""
+    logger.info("Converting Philosophy Stack Exchange Snapshots to Delta...")
+    prefix = "philosophy_se/raw_json/"
+    
+    try:
+        # Get latest snapshot
+        objects = client.list_objects_v2(Bucket=MINIO_BUCKET, Prefix=prefix).get('Contents', [])
+        if not objects:
+            logger.warning("  No philosophy SE snapshots found.")
+            return
+            
+        latest_obj = sorted(objects, key=lambda x: x['LastModified'])[-1]
+        obj_key = latest_obj['Key']
+        logger.info("  Processing latest snapshot: %s", obj_key)
+        
+        resp = client.get_object(Bucket=MINIO_BUCKET, Key=obj_key)
+        data = json.loads(resp['Body'].read().decode('utf-8'))
+        
+        df = pd.json_normalize(data)
+        
+        table_path = f"{DELTA_ROOT}/philosophy_se_questions"
+        # mode="append" generates a growing archive of Q&A over time
+        write_deltalake(table_path, df, mode="append")
+        logger.info("  ✓ Delta table updated: %s", table_path)
+    except Exception as e:
+        logger.error("  ✗ Failed to convert philosophy SE: %s", e)
+
 # ─── Main Execution ───────────────────────────────────────────────────────────
 def run():
     client = get_minio_client()
@@ -178,6 +242,8 @@ def run():
     convert_wikipedia_to_delta(client)
     convert_gutenberg_metadata_to_delta(client)
     convert_podcast_metadata_to_delta(client)
+    convert_wikiquote_to_delta(client)
+    convert_philosophy_se_to_delta(client)
     logger.info("✓ Delta Lake conversion complete.")
 
 if __name__ == "__main__":

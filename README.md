@@ -30,6 +30,8 @@ The challenge is that such an AI needs to answer a deceptively complex question:
 |---|---|---|
 | **Core Biographical Facts** | Names, schools of thought, dates, concepts, portraits | Philosophers REST API & Wikipedia |
 | **Authoritative Writings** | The actual vocabulary, reasoning style, and syntax of the philosopher | Project Gutenberg (Public Domain books) |
+| **Verified Quotes** | Authentic historical quotes and citations | Wikiquote MediaWiki API |
+| **Community Q&A** | Modern philosophical debates, clarifications, and community Q&A | Philosophy Stack Exchange API |
 | **Conversational Dynamics** | How an interview or debate flows — tone, pacing, turn-taking | Podcast Audio (iTunes RSS) |
 | **Current Events Awareness** | Top trending daily news so the historical figure can "react" to the modern world | GNews API (Top Headlines) |
 
@@ -54,10 +56,15 @@ The pipeline follows a **Registry-Driven, Micro-Ingestion architecture** organiz
 │  │ • Images (JPEG)  │   │ • Author catalog │   │ • JSON Metadata  │        │
 │  └────────┬─────────┘   └────────┬─────────┘   └────────┬─────────┘        │
 │           │                      │                      │                   │
-│  ┌────────▼─────────┐   ┌────────┴──────┐      ┌────────▼─────────┐         │
-│  │ Wikipedia API    │   │  gnews.io     │      │ pipeline_complete│         │
-│  │ Biography Sums   │   │  Top Headlines│      │ (dummy summary)  │         │
-│  └────────┬─────────┘   └────────┬──────┘      └────────▲─────────┘         │
+│  ┌────────▼─────────┐   ┌────────┴──────┐      ┌────────┴──────┐         │
+│  │ Wikipedia API    │   │ Wikiquote API │      │ StackExchange │         │
+│  │ Biography Sums   │   │ Quotes/Facts  │      │ Q&A History   │         │
+│  └────────┬─────────┘   └────────┬──────┘      └────────┬──────┘         │
+│           │                      │                      │                   │
+│  ┌────────▼─────────┐   ┌────────▼─────────┐      ┌────────▼─────────┐         │
+│  │ gnews.io         │   │ iTunes API       │      │ pipeline_complete│         │
+│  │ Top Headlines    │   │ Podcast Audio    │      │ (dummy summary)  │         │
+│  └────────┬─────────┘   └────────┬─────────┘      └────────▲─────────┘         │
 └───────────┼─────────────────────┼──────────────────────┼───────────────────┘
             │                     │                      │
 ┌───────────▼─────────────────────▼──────────────────────▼───────────────────┐
@@ -79,12 +86,13 @@ The pipeline follows a **Registry-Driven, Micro-Ingestion architecture** organiz
 │  │ _api           │  │                │  │               │  │              ││
 │  └───────┬────────┘  └───────┬────────┘  └───────┬───────┘  └──────┬───────┘│
 │          │                   │                   │                 │        │
-│          └───────────────────┼───────────────────┼─────────────────┘        │
-│                               ▼                  │                          │
-│                      ┌────────────────┐          │                          │
-│                      │ ingest_news_api│ ─────────┘                          │
-│                      └───────┬────────┘                                     │
-│                               ▼                                             │
+│  ┌───────▼────────┐  ┌───────▼────────┐  ┌───────▼────────┐        │        │
+│  │ ingest_news_api│  │ ingest_        │  │ ingest_        │        │        │
+│  │                │  │ wikiquote      │  │ philosophy_se  │        │        │
+│  └───────┬────────┘  └───────┬────────┘  └───────┬────────┘        │        │
+│          │                   │                   │                 │        │
+│          └───────────────────┴─────────┬─────────┴─────────────────┘        │
+│                                        ▼                                    │
 │                     ┌──────────────────┐                                    │
 │                     │ convert_to_delta │                                    │
 │                     └────────┬─────────┘                                    │
@@ -103,6 +111,8 @@ The pipeline follows a **Registry-Driven, Micro-Ingestion architecture** organiz
 │  ├── philosophers_api/  ← (domain filtered)                                 │
 │  ├── gutenberg/         ← raw_text/{domain}/{slug}_{id}.txt                 │
 │  ├── wikipedia/         ← raw_json/{domain}/{slug}_wikipedia.json           │
+│  ├── wikiquote/         ← raw_json/{domain}/{slug}_wikiquote.json           │
+│  ├── philosophy_se/     ← raw_json/philosophy_se_snapshot_{date}.json       │
 │  ├── podcasts/          ← raw_audio/{podcast_slug}/ep_{id}.mp3              │
 │  ├── hot_path/          ← raw_stream/mentions_{timestamp}.json              │
 │  ├── news_api/          ← raw_json/news_snapshot_{date}.json                │
@@ -110,6 +120,8 @@ The pipeline follows a **Registry-Driven, Micro-Ingestion architecture** organiz
 │      ├── philosophers/  ← Unified metadata from Philosophers API            │
 │      ├── news_headlines/← Daily aggregated news snapshots                   │
 │      ├── wikipedia_biographies/ ← Structured character summaries (Facts)    │
+│      ├── wikiquote_quotes/      ← Verified character quotes and citations   │
+│      ├── philosophy_se_questions/ ← Philosophy Stack Exchange archive       │
 │      ├── gutenberg_library/     ← Catalog of available texts                │
 │      └── podcast_episodes/      ← Metadata for downloaded audio             │
 │                                                                             │
@@ -246,7 +258,33 @@ All scripts live in `ingestion/` and follow a strict, consistent design pattern:
 
 ---
 
-### 5. `news_ingest.py` — Daily Trending News Snapshots
+### 5. `wikiquote_ingest.py` — Verified Quotes & Citations
+**Source:** Wikiquote MediaWiki API (`en.wikiquote.org/w/api.php`).
+
+**What it does:**
+1. Iterates through every figure in the `character_registry.py`.
+2. Fetches verified quotes and citations using the `wikidata_label` as the page title.
+3. Provides the "voice" of the historical figure through their own historically attributed words.
+4. **Idempotency:** Applies a `head_object` check to avoid redundant API hits for static quotes.
+
+**Storage path:** `s3://landing-zone/wikiquote/raw_json/{domain}/{slug}_wikiquote.json`
+
+---
+
+### 6. `philosophyse_ingest.py` — Community Q&A & Modern Debates
+**Source:** [Stack Exchange API](https://api.stackexchange.com/) — Philosophy site.
+
+**What it does:**
+1. Downloads the top 500 highest-voted questions with accepted answers from the Philosophy Stack Exchange.
+2. Captures modern community interpretations and common clarifications of philosophical concepts.
+3. Each question is tagged with a `_ingested_at` timestamp for temporal tracking.
+4. **Daily Snapshot:** Aggregates all Q&A into a single JSON snapshot per day.
+
+**Storage path:** `s3://landing-zone/philosophy_se/raw_json/philosophy_se_snapshot_{YYYYMMDD}.json`
+
+---
+
+### 7. `news_ingest.py` — Daily Trending News Snapshots
 **Source:** [GNews API](https://gnews.io/) — Aggregates top stories from Google News.
 
 **What it does:**
@@ -261,7 +299,7 @@ All scripts live in `ingestion/` and follow a strict, consistent design pattern:
 
 ---
 
-### 6. `stream_producer.py` & `stream_consumer.py` — The Hot Path Ingestion
+### 8. `stream_producer.py` & `stream_consumer.py` — The Hot Path Ingestion
 **Source:** Simulated Real-time Character Mentions (Kafka).
 
 **What it does:**
@@ -274,7 +312,7 @@ All scripts live in `ingestion/` and follow a strict, consistent design pattern:
 
 ---
 
-### 7. `metadata_to_delta.py` — The Master Lakehouse Orchestrator
+### 9. `metadata_to_delta.py` — The Master Lakehouse Orchestrator
 **Role:** Converts raw semi-structured JSON objects from all sources into a structured **Delta Lake** format.
 
 **What it does:**
@@ -283,6 +321,8 @@ All scripts live in `ingestion/` and follow a strict, consistent design pattern:
    - `philosophers`: All core metadata from the Philosophers API.
    - `news_headlines`: A history of all daily news snapshots.
    - `wikipedia_biographies`: Factual summaries (biographies) for all characters.
+   - `wikiquote_quotes`: Aggregated verified quotes and citations.
+   - `philosophy_se_questions`: Archive of Stack Exchange Q&A history.
    - `gutenberg_library`: A searchable catalog of every text file available.
    - `podcast_episodes`: An index of all audio files with their durations and descriptions.
 3. **Big Data Features:** Adds **Time Travel**, **Schema Enforcement**, and high-speed **Parquet** storage to the Bronze Layer.
@@ -331,17 +371,13 @@ It defines a `TARGET_FIGURES` list where each historical figure is a dict with a
 ```
 check_minio_health
         │
-        ├──► ingest_philosophers_api   ─────┐
-        ├──► ingest_gutenberg          ─────┤
-        ├──► ingest_podcast_audio      ─────┤
-        ├──► ingest_wikipedia_biog     ─────┤
-        └──► ingest_news_api           ─────┘
-                                            │
-                                            ▼
-                                     convert_to_delta
-                                            │
-                                            ▼
-                                     pipeline_complete
+        ├──► ingest_philosophers_api   ─────────┐
+        ├──► ingest_gutenberg          ─────────┤
+        ├──► ingest_podcast_audio      ─────────┤
+        ├──► ingest_wikipedia_biog     ─────────┼──► convert_to_delta ──► pipeline_complete
+        ├──► ingest_news_api           ─────────┤
+        ├──► ingest_wikiquote          ─────────┤
+        └──► ingest_philosophy_se      ─────────┘
 ```
 
 **How tasks execute:** Each ingestion task calls `_run_ingestion_script()`, which runs the Python script as a subprocess using `sys.executable` (the same Python interpreter as Airflow). Stdout/Stderr are captured and forwarded to the Airflow task log.
@@ -380,6 +416,15 @@ landing_zone/
     │       │   └── plato_wikipedia.json
     │       └── science/
     │           └── einstein_wikipedia.json
+    ├── wikiquote/
+    │   └── raw_json/
+    │       ├── philosophy/
+    │       │   └── plato_wikiquote.json
+    │       └── science/
+    │           └── einstein_wikiquote.json
+    ├── philosophy_se/
+    │   └── raw_json/
+    │       └── philosophy_se_snapshot_20260411.json
     ├── podcasts/
     │   ├── raw_audio/
     │   │   └── philosophize_this/
@@ -387,10 +432,13 @@ landing_zone/
     │   └── metadata/
     │       └── philosophize_this/
     │           └── ep_kant_intro_meta.json
-    └── news_api/
-        └── raw_json/
-            ├── news_snapshot_20260408.json       ← Daily trending headlines snapshot
-            └── news_snapshot_20260409.json
+    ├── news_api/
+    │   └── raw_json/
+    │       ├── news_snapshot_20260408.json       ← Daily trending headlines snapshot
+    │       └── news_snapshot_20260409.json
+    └── hot_path/
+        └── raw_stream/
+            └── mentions_{timestamp}.json         ← Real-time Kafka stream flushes
 ```
 
 ---
@@ -410,7 +458,9 @@ P1/
 │   ├── gutenberg_ingest.py        # Project Gutenberg → Plain Text Books → MinIO
 │   ├── podcast_audio_ingest.py    # iTunes RSS → Audio .mp3 → MinIO
 │   ├── wikipedia_ingest.py        # Wikipedia API → Bio JSON → MinIO
-│   ├── news_api.py                # GNews API → Daily Headlines JSON → MinIO
+│   ├── wikiquote_ingest.py        # Wikiquote API → Quotes JSON → MinIO
+│   ├── philosophyse_ingest.py     # StackExchange → Q&A JSON → MinIO
+│   ├── news_ingest.py             # GNews API → Daily Headlines JSON → MinIO
 │   ├── stream_producer.py         # SIMULATED trends → Kafka
 │   ├── stream_consumer.py         # Kafka → MinIO (Hot Path)
 │   └── metadata_to_delta.py       # JSON → Delta Lake (Lakehouse conversion)

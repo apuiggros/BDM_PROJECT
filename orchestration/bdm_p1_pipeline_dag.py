@@ -13,9 +13,16 @@ DAG Graph
   check_minio_health
         │
         ├──> ingest_philosophers_api
-        └──> ingest_gutenberg
+        ├──> ingest_gutenberg
+        ├──> ingest_podcast_audio
+        ├──> ingest_wikipedia_biographies
+        ├──> ingest_news_api
+        ├──> ingest_wikiquote
+        └──> ingest_philosophy_se
                 │
-                └──> pipeline_complete  (dummy summary task)
+                └──> convert_raw_to_delta
+                        │
+                        └──> pipeline_complete
 """
 
 from __future__ import annotations
@@ -114,6 +121,14 @@ def run_wikipedia() -> None:
     _run_ingestion_script("wikipedia_ingest.py")
 
 
+def run_wikiquote() -> None:
+    _run_ingestion_script("wikiquote_ingest.py")
+
+
+def run_philosophy_se() -> None:
+    _run_ingestion_script("philosophyse_ingest.py")
+
+
 def run_delta_conversion() -> None:
     _run_ingestion_script("metadata_to_delta.py")
 
@@ -174,6 +189,18 @@ with DAG(
         doc_md="Fetches structured biography summaries from the Wikipedia REST API for all target figures.",
     )
 
+    ingest_wikiquote = PythonOperator(
+        task_id="ingest_wikiquote",
+        python_callable=run_wikiquote,
+        doc_md="Fetches verified quotes for all target figures from the Wikiquote MediaWiki API.",
+    )
+
+    ingest_philosophy_se = PythonOperator(
+        task_id="ingest_philosophy_se",
+        python_callable=run_philosophy_se,
+        doc_md="Downloads top-voted philosophy Q&A pairs from the Philosophy Stack Exchange API.",
+    )
+
     # ── Delta Lake Transformation (Runs after batch sources are captured) ────
     ingest_delta_lake = PythonOperator(
         task_id="convert_raw_to_delta",
@@ -189,5 +216,22 @@ with DAG(
 
     # ── Task Dependencies ─────────────────────────────────────────────────────
     # health_check → [parallel ingestion tasks] → delta_conversion → pipeline_done
-    health_check >> [ingest_philosophers, ingest_gutenberg, ingest_podcasts, ingest_news, ingest_wikipedia]
-    [ingest_philosophers, ingest_gutenberg, ingest_podcasts, ingest_news, ingest_wikipedia] >> ingest_delta_lake >> pipeline_done
+    health_check >> [
+        ingest_philosophers,
+        ingest_gutenberg,
+        ingest_podcasts,
+        ingest_news,
+        ingest_wikipedia,
+        ingest_wikiquote,
+        ingest_philosophy_se,
+    ]
+    [
+        ingest_philosophers,
+        ingest_gutenberg,
+        ingest_podcasts,
+        ingest_news,
+        ingest_wikipedia,
+        ingest_wikiquote,
+        ingest_philosophy_se,
+    ] >> ingest_delta_lake >> pipeline_done
+
