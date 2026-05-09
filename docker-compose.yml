@@ -15,13 +15,17 @@ x-airflow-common: &airflow-common
     - MINIO_BUCKET=landing-zone
     # Path to ingestion scripts inside the container
     - INGESTION_DIR=/opt/airflow/ingestion
+    # Path to cleaning scripts inside the container
+    - CLEANING_DIR=/opt/airflow/cleaning
     # Ensure our API libraries exist in the Airflow environment
-    - _PIP_ADDITIONAL_REQUIREMENTS=pandas boto3 python-dotenv deltalake
+    - _PIP_ADDITIONAL_REQUIREMENTS=pandas boto3 python-dotenv deltalake pyarrow
   volumes:
     # DAGs directory
     - ./orchestration:/opt/airflow/dags
     # Ingestion scripts — available to tasks via subprocess
     - ./ingestion:/opt/airflow/ingestion
+    # Cleaning scripts
+    - ./cleaning:/opt/airflow/cleaning
     # Persistent Airflow logs
     - airflow_logs:/opt/airflow/logs
   env_file:

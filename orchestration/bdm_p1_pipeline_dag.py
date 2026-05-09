@@ -31,6 +31,7 @@ import logging
 import os
 import subprocess
 import sys
+import logging
 from datetime import datetime, timedelta
 
 from airflow import DAG
@@ -52,7 +53,7 @@ DEFAULT_ARGS = {
 # Path to the ingestion scripts inside the Airflow container.
 # The /opt/airflow/ingestion volume mount must be added to docker-compose.yml
 INGESTION_DIR = os.getenv("INGESTION_DIR", "/opt/airflow/ingestion")
-
+CLEANING_DIR  = os.getenv("CLEANING_DIR", "/opt/airflow/cleaning") # Add this!
 logger = logging.getLogger(__name__)
 
 
@@ -90,17 +91,7 @@ def _run_ingestion_script(script_name: str) -> None:
     """
     script_path = os.path.join(INGESTION_DIR, script_name)
     logger.info("Running ingestion script: %s", script_path)
-    result = subprocess.run(
-        [sys.executable, script_path],
-        capture_output=True,
-        text=True,
-        check=True,
-    )
-    if result.stdout:
-        logger.info(result.stdout)
-    if result.stderr:
-        logger.warning(result.stderr)
-
+    _run_python_script(INGESTION_DIR, script_name)
 
 def run_philosophers() -> None:
     _run_ingestion_script("philosophers_ingest.py")
@@ -132,6 +123,35 @@ def run_philosophy_se() -> None:
 def run_delta_conversion() -> None:
     _run_ingestion_script("metadata_to_delta.py")
 
+# -- Run Cleaning Script --------------------------------------
+
+def _run_python_script(directory: str, script_name: str) -> None:
+    """
+    Executes a python script from a specific directory.
+    Captures output and ensures stderr is logged on failure.
+    """
+    script_path = os.path.join(directory, script_name)
+    logger.info("Running script: %s", script_path)
+    
+    try:
+        result = subprocess.run(
+            [sys.executable, script_path],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        if result.stdout:
+            logger.info("Script STDOUT:\n%s", result.stdout)
+    except subprocess.CalledProcessError as e:
+        logger.error("Script FAILED with exit code %s", e.returncode)
+        if e.stdout:
+            logger.info("Script STDOUT (before failure):\n%s", e.stdout)
+        if e.stderr:
+            logger.error("Script STDERR:\n%s", e.stderr)
+        raise
+        
+def run_philosophers_cleaning() -> None:
+    _run_python_script(CLEANING_DIR, "philosophers.py")
 
 # ─── DAG Definition ───────────────────────────────────────────────────────────
 with DAG(
@@ -208,6 +228,12 @@ with DAG(
         doc_md="Transforms raw JSON metadata catalogs into structured Delta Tables for the Data Lakehouse layer.",
     )
 
+    # Clean 
+    clean_philosophers = PythonOperator(
+        task_id="clean_philosophers",
+        python_callable=run_philosophers_cleaning,
+        doc_md="Cleans and preprocesses philosopher records.",
+    )
     # ── Summary task (downstream gate) ───────────────────────────────────────
     pipeline_done = EmptyOperator(
         task_id="pipeline_complete",
@@ -225,8 +251,9 @@ with DAG(
         ingest_wikiquote,
         ingest_philosophy_se,
     ]
-    [
-        ingest_philosophers,
+    ingest_philosophers >> clean_philosophers
+    [   
+        clean_philosophers,
         ingest_gutenberg,
         ingest_podcasts,
         ingest_news,
@@ -234,4 +261,3 @@ with DAG(
         ingest_wikiquote,
         ingest_philosophy_se,
     ] >> ingest_delta_lake >> pipeline_done
-
