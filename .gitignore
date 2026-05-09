@@ -20,6 +20,10 @@ __pycache__/
 # data files and MinIO internal metadata. None of this belongs in version control.
 landing_zone/
 
+# ─── Trusted Zone — DuckDB files ──────────────────────────────────────────────
+# Output of the Trusted Zone cleaning jobs. Regenerated from the landing zone.
+duckdb/
+
 # ─── Jupyter / IPython ────────────────────────────────────────────────────────
 .ipynb_checkpoints/
 *.ipynb
