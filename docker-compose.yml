@@ -2,7 +2,10 @@ version: '3.8'
 
 # ─── Shared Airflow configuration block (YAML anchor) ────────────────────────
 x-airflow-common: &airflow-common
-  image: apache/airflow:2.9.0
+  build:
+    context: .
+    dockerfile: Dockerfile.airflow
+  image: bdm/airflow-spark:2.9.0
   environment:
     # Core settings
     - AIRFLOW__CORE__LOAD_EXAMPLES=False
@@ -13,15 +16,22 @@ x-airflow-common: &airflow-common
     - MINIO_ACCESS_KEY=admin
     - MINIO_SECRET_KEY=password
     - MINIO_BUCKET=landing-zone
-    # Path to ingestion scripts inside the container
+    # Paths inside the container
     - INGESTION_DIR=/opt/airflow/ingestion
-    # Ensure our API libraries exist in the Airflow environment
-    - _PIP_ADDITIONAL_REQUIREMENTS=pandas boto3 python-dotenv deltalake
+    - CLEANING_DIR=/opt/airflow/cleaning
+    - SCRIPTS_DIR=/opt/airflow/scripts
+    - DUCKDB_DIR=/opt/airflow/duckdb
   volumes:
     # DAGs directory
     - ./orchestration:/opt/airflow/dags
-    # Ingestion scripts — available to tasks via subprocess
+    # Ingestion scripts — used by the P1 cold-path DAG
     - ./ingestion:/opt/airflow/ingestion
+    # Cleaning scripts — used by the P2 trusted-zone DAG
+    - ./cleaning:/opt/airflow/cleaning
+    # One-off helper scripts (verifier, etc.)
+    - ./scripts:/opt/airflow/scripts
+    # DuckDB output directory (host-readable so we can inspect results)
+    - ./duckdb:/opt/airflow/duckdb
     # Persistent Airflow logs
     - airflow_logs:/opt/airflow/logs
   env_file:
