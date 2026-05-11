@@ -160,9 +160,30 @@ services:
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
       KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
 
+  streamlit:
+    image: python:3.11-slim
+    container_name: streamlit-dashboard
+    working_dir: /app
+    volumes:
+      - ./streamlit_app:/app
+    ports:
+      - "8501:8501"
+    environment:
+      - MINIO_ENDPOINT=http://minio:9000
+      - MINIO_ACCESS_KEY=admin
+      - MINIO_SECRET_KEY=password
+      - MINIO_BUCKET=landing-zone
+    command: >
+      bash -c "pip install -r requirements.txt &&
+               streamlit run app.py --server.port=8501 --server.address=0.0.0.0"
+    depends_on:
+      minio:
+        condition: service_healthy
+
 # ─── Named Volumes ────────────────────────────────────────────────────────────
 volumes:
   airflow_logs:
     driver: local
   postgres_data:
     driver: local
+

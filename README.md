@@ -683,3 +683,19 @@ Each script uses a different idempotency model appropriate for its data type:
 | Philosophy SE Q&A | ~2 MB/snapshot | ~60 MB/month (append mode) |
 | Philosophers API | ~30 KB | Static (daily overwrite) |
 | Hot path stream | Variable | Continuous (buffer-and-flush) |
+
+
+### Important link to check the project
+
+#### Airflow
+http://localhost:8080
+user: admin
+password: admin
+#### MinIO
+http://localhost:9001
+user: admin
+password: password
+#### Kafka
+http://localhost:8085
+#### Streamlit demo
+http://localhost:8501
