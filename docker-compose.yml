@@ -166,6 +166,7 @@ services:
     working_dir: /app
     volumes:
       - ./streamlit_app:/app
+      - ./trusted:/repo/trusted
     ports:
       - "8501:8501"
     environment:
@@ -179,6 +180,18 @@ services:
     depends_on:
       minio:
         condition: service_healthy
+  spark:
+    image: apache/spark:3.5.5
+    container_name: spark
+    user: root
+    working_dir: /app
+    volumes:
+      - ./:/app
+    ports:
+      - "4040:4040"
+    command: ["sleep", "infinity"]
+    depends_on:
+      - kafka
 
 # ─── Named Volumes ────────────────────────────────────────────────────────────
 volumes:

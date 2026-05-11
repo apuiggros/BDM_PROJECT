@@ -51,3 +51,58 @@ try:
 except Exception as e:
     st.error("Could not connect to MinIO.")
     st.exception(e)
+
+import glob
+
+st.header("Streaming Mentions — 1 Minute Aggregates")
+
+STREAMING_PATH = "/repo/trusted/streaming/fact_mentions_1m"
+
+parquet_files = glob.glob(f"{STREAMING_PATH}/*.parquet")
+
+if not parquet_files:
+    st.warning("No streaming aggregate files found yet.")
+else:
+    df_stream = pd.read_parquet(STREAMING_PATH)
+
+    st.metric("Streaming Aggregate Rows", len(df_stream))
+
+    st.dataframe(df_stream, use_container_width=True)
+
+    st.subheader("Mentions by Character")
+    mentions_by_character = (
+        df_stream.groupby("character_name")["mention_count"]
+        .sum()
+        .sort_values(ascending=False)
+    )
+
+    st.bar_chart(mentions_by_character)
+    
+import glob
+
+st.header("Streaming Mentions Analytics")
+
+STREAMING_PATH = "/repo/trusted/streaming/fact_mentions_1m"
+
+parquet_files = glob.glob(f"{STREAMING_PATH}/*.parquet")
+
+if parquet_files:
+
+    df_stream = pd.read_parquet(STREAMING_PATH)
+
+    st.metric("Aggregated Rows", len(df_stream))
+
+    st.dataframe(df_stream, use_container_width=True)
+
+    mentions_chart = (
+        df_stream.groupby("character_name")["mention_count"]
+        .sum()
+        .sort_values(ascending=False)
+    )
+
+    st.subheader("Mentions by Character")
+
+    st.bar_chart(mentions_chart)
+
+else:
+    st.warning("No streaming parquet files detected.")

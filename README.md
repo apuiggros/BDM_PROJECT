@@ -699,3 +699,9 @@ password: password
 http://localhost:8085
 #### Streamlit demo
 http://localhost:8501
+
+### To test streaming
+docker compose exec spark python /app/ingestion/kafka_mentions_producer.py
+docker compose exec spark /opt/spark/bin/spark-submit `
+  --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.5 `
+  /app/ingestion/spark_stream_mentions_1m.py
