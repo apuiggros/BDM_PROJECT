@@ -2,17 +2,19 @@
 wikiquote_ingest.py
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Source        : Wikiquote MediaWiki API (https://en.wikiquote.org/w/api.php)
-Data Type     : Semi-structured (JSON — verified quotes extract)
+Data Type     : Semi-structured (JSON wrapping rendered HTML)
 Landing Zone  : s3://landing-zone/wikiquote/raw_json/{domain}/
 Pipeline Stage: P1 — Cold-Path Batch Ingestion
 
 Description
 -----------
-Fetches verified quotes for ALL target figures in the registry
-using the public Wikiquote MediaWiki API.
+Fetches the full rendered HTML of each figure's Wikiquote page using the
+MediaWiki `action=parse` endpoint. The HTML is preserved as-is so that the
+Trusted Zone can parse it for individual quote rows (both quotes BY the
+figure and quotes ABOUT them).
 
 Data is organized by domain under a subdirectory:
-  wikiquote/raw_json/philosophy/plato_wikiquote.json
+  wikiquote/raw_json/philosophy/descartes_wikiquote.json
 """
 
 import json
@@ -81,22 +83,28 @@ def upload_to_minio(client: boto3.client, data: dict, object_key: str) -> None:
 # ─── Wikiquote Fetch ──────────────────────────────────────────────────────────
 def fetch_wikiquote_content(title: str) -> dict | None:
     """
-    Fetch the Wikiquote page content for a given title.
+    Fetch the full rendered HTML of a Wikiquote page via `action=parse`.
     Returns the full JSON response dict, or None on failure.
+
+    The HTML lives at response["parse"]["text"]["*"] and contains every
+    section of the page (Quotations, Quotes about X, Misattributed, etc.).
+    Section selection and quote extraction happens in the Trusted Zone.
     """
     params = {
-        "action": "query",
-        "titles": title,
-        "prop": "extracts",
+        "action": "parse",
+        "page": title,
+        "prop": "text|sections",
         "format": "json",
-        "exintro": "false"
+        "redirects": 1,
+        "disablelimitreport": 1,
+        "disabletoc": 1,
     }
-    
+
     try:
         resp = requests.get(
-            WIKIQUOTE_API_BASE, 
-            params=params, 
-            timeout=15, 
+            WIKIQUOTE_API_BASE,
+            params=params,
+            timeout=20,
             headers={"User-Agent": "BDM-Pipeline/1.0"}
         )
         resp.raise_for_status()
@@ -143,16 +151,19 @@ def run() -> None:
             
         logger.info("[%s] Fetching Wikiquote for: %s", domain, name)
         data = fetch_wikiquote_content(title)
-        
+
         if not data:
             continue
-            
-        # Presence check in MediaWiki format
-        pages = data.get("query", {}).get("pages", {})
-        if not pages or "-1" in pages:
-            logger.warning("  ✗ Page not found on Wikiquote for '%s'.", title)
+
+        if "error" in data:
+            logger.warning("  ✗ MediaWiki error for '%s': %s", title, data["error"].get("info"))
             continue
-            
+
+        html = data.get("parse", {}).get("text", {}).get("*")
+        if not html:
+            logger.warning("  ✗ No parsed HTML returned for '%s'.", title)
+            continue
+
         upload_to_minio(client, data, obj_key)
     
     logger.info("✓ Wikiquote ingestion complete.")
