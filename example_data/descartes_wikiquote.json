@@ -1,0 +1,24 @@
+{
+  "batchcomplete": "",
+  "warnings": {
+    "extracts": {
+      "*": "HTML may be malformed and/or unbalanced and may omit inline images. Use at your own risk. Known problems are listed at https://www.mediawiki.org/wiki/Special:MyLanguage/Extension:TextExtracts#Caveats."
+    }
+  },
+  "query": {
+    "normalized": [
+      {
+        "from": "René_Descartes",
+        "to": "René Descartes"
+      }
+    ],
+    "pages": {
+      "210": {
+        "pageid": 210,
+        "ns": 0,
+        "title": "René Descartes",
+        "extract": "<p><b>René Descartes</b> (March 31, 1596 – February 11, 1650) was a highly influential French philosopher, mathematician, physicist and writer. He is known for his influential arguments for substance dualism, where mind and body are considered to have distinct essences, one being characterized by thought, the other by spatial extension. He has been dubbed the \"Father of Modern Philosophy\" and the \"Father of Modern Mathematics.\" He is also known as <b>Cartesius</b>.\n</p>\n<dl><dd>See also\n<dl><dd><i><b>Discourse on the Method</b></i> (1637)</dd>\n<dd><i><b>La Géométrie</b></i> (1637)</dd>\n<dd><i><b>Meditations on First Philosophy</b></i> (1641)</dd>\n<dd><i><b>Principles of Philosophy</b></i> (1644)</dd></dl></dd></dl>"
+      }
+    }
+  }
+}

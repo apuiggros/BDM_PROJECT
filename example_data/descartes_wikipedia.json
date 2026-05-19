@@ -1,0 +1,49 @@
+{
+  "type": "standard",
+  "title": "René Descartes",
+  "displaytitle": "<span lang=\"en\" dir=\"ltr\"><span class=\"mw-page-title-main\">René Descartes</span></span>",
+  "namespace": {
+    "id": 0,
+    "text": ""
+  },
+  "wikibase_item": "Q9191",
+  "titles": {
+    "canonical": "René_Descartes",
+    "normalized": "René Descartes",
+    "display": "<span lang=\"en\" dir=\"ltr\"><span class=\"mw-page-title-main\">René Descartes</span></span>"
+  },
+  "pageid": 25525,
+  "thumbnail": {
+    "source": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/73/Frans_Hals_-_Portret_van_Ren%C3%A9_Descartes.jpg/330px-Frans_Hals_-_Portret_van_Ren%C3%A9_Descartes.jpg",
+    "width": 330,
+    "height": 404
+  },
+  "originalimage": {
+    "source": "https://upload.wikimedia.org/wikipedia/commons/7/73/Frans_Hals_-_Portret_van_Ren%C3%A9_Descartes.jpg",
+    "width": 817,
+    "height": 1000
+  },
+  "lang": "en",
+  "dir": "ltr",
+  "revision": "1351100613",
+  "tid": "f022a72d-40fa-11f1-98e5-8d385f57e8aa",
+  "timestamp": "2026-04-25T23:03:14Z",
+  "description": "French philosopher and mathematician (1596–1650)",
+  "description_source": "local",
+  "content_urls": {
+    "desktop": {
+      "page": "https://en.wikipedia.org/wiki/Ren%C3%A9_Descartes",
+      "revisions": "https://en.wikipedia.org/wiki/Ren%C3%A9_Descartes?action=history",
+      "edit": "https://en.wikipedia.org/wiki/Ren%C3%A9_Descartes?action=edit",
+      "talk": "https://en.wikipedia.org/wiki/Talk:Ren%C3%A9_Descartes"
+    },
+    "mobile": {
+      "page": "https://en.wikipedia.org/wiki/Ren%C3%A9_Descartes",
+      "revisions": "https://en.wikipedia.org/wiki/Special:History/Ren%C3%A9_Descartes",
+      "edit": "https://en.wikipedia.org/wiki/Ren%C3%A9_Descartes?action=edit",
+      "talk": "https://en.wikipedia.org/wiki/Talk:Ren%C3%A9_Descartes"
+    }
+  },
+  "extract": "René Descartes was a French philosopher, scientist, logician, and mathematician, widely considered a seminal figure in the emergence of modern philosophy and science during the Renaissance era. Mathematics was paramount to his method of inquiry, and he connected the previously separate fields of geometry and algebra into analytic geometry.",
+  "extract_html": "<p><b>René Descartes</b> was a French philosopher, scientist, logician, and mathematician, widely considered a seminal figure in the emergence of modern philosophy and science during the Renaissance era. Mathematics was paramount to his method of inquiry, and he connected the previously separate fields of geometry and algebra into analytic geometry.</p>"
+}
