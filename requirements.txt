@@ -19,3 +19,16 @@ pyarrow>=15.0.0           # Underpinning for Delta/Parquet storage
 # ─── Streaming / Messaging ────────────────────────────────────────────────────
 kafka-python-ng>=2.2.0    # Kafka client (Producer/Consumer)
 
+# ─── Exploitation Zone — vector store + embeddings ────────────────────────────
+# Used only by exploitation/structured/corpus_chunks.py: the Spark job that
+# chunks the Gutenberg/Wikipedia/Wikiquote/SE corpus and writes embeddings to
+# Milvus for the chatbot's RAG retrieval. Justified by data volume (~161 books,
+# tens of thousands of chunks) + a real downstream consumer (Reasoner/Voice).
+pymilvus>=2.4.0,<2.5.0    # Milvus client (must match the v2.4.x server image)
+sentence-transformers>=3.0.0  # all-MiniLM-L6-v2 sentence embeddings (384-dim)
+
+# ─── Consumption Zone — podcast generation ────────────────────────────────────
+# Consumed only by consumption/llm.py: the Anthropic-backed llm_fn the
+# Interviewer/Reasoner/Voice agents call to generate in-voice podcast turns.
+anthropic>=0.40.0
+

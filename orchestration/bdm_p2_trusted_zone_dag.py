@@ -41,6 +41,7 @@ from datetime import timedelta
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 from airflow.operators.empty import EmptyOperator
+from airflow.operators.trigger_dagrun import TriggerDagRunOperator
 from airflow.utils.dates import days_ago
 
 # ─── Defaults ────────────────────────────────────────────────────────────────
@@ -212,8 +213,20 @@ with DAG(
 
     pipeline_done = EmptyOperator(task_id="trusted_zone_complete")
 
+    # Once the Trusted Zone is green, kick off the Exploitation Zone DAG so the
+    # two run as one chain on a single trigger. wait_for_completion=False keeps
+    # this DAG run short; reset_dag_run=True makes re-runs idempotent.
+    trigger_exploitation = TriggerDagRunOperator(
+        task_id="trigger_exploitation_zone",
+        trigger_dag_id="bdm_p2_exploitation_zone",
+        wait_for_completion=False,
+        reset_dag_run=True,
+        doc_md="Auto-triggers bdm_p2_exploitation_zone after a green Trusted Zone.",
+    )
+
     # Dependencies
     health_check >> structured_tasks
     health_check >> gutenberg_catalog_task >> gutenberg_texts_task
 
     (structured_tasks + [gutenberg_texts_task]) >> verify_task >> pipeline_done
+    pipeline_done >> trigger_exploitation
