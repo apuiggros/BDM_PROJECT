@@ -42,6 +42,12 @@ airflow.db
 airflow.cfg
 airflow_settings.yaml
 
+# ─── Consumption Zone — generated episodes ────────────────────────────────────
+# Podcast episodes are produced at runtime by the consumption agents (and are
+# owned by the uid-50000 Airflow container user). Demo artifacts, regenerated.
+consumption/episodes/*
+!consumption/episodes/.gitkeep
+
 # ─── Build / Distribution ─────────────────────────────────────────────────────
 dist/
 build/
