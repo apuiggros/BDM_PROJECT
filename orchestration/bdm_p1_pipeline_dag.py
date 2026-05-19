@@ -202,10 +202,19 @@ with DAG(
     )
 
     # ── Delta Lake Transformation (Runs after batch sources are captured) ────
+    # NOTE: This task is a P1 deliverable. P2's Trusted Zone (see
+    # bdm_p2_trusted_zone_dag.py) reads the raw JSON/text from the landing
+    # zone directly and writes typed tables to DuckDB, so the bronze_tables/
+    # Delta layer produced here is no longer part of the active P2 pipeline.
+    # Kept as-is for P1 grading consistency.
     ingest_delta_lake = PythonOperator(
         task_id="convert_raw_to_delta",
         python_callable=run_delta_conversion,
-        doc_md="Transforms raw JSON metadata catalogs into structured Delta Tables for the Data Lakehouse layer.",
+        doc_md=(
+            "P1-only artifact. Transforms raw JSON metadata catalogs into "
+            "structured Delta Tables for the Data Lakehouse layer. P2 reads "
+            "raw landing-zone bytes directly and does not depend on this output."
+        ),
     )
 
     # ── Summary task (downstream gate) ───────────────────────────────────────

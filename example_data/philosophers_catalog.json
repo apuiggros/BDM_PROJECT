@@ -1,0 +1,329 @@
+[
+  {
+    "life": "(c.427-c.347 BCE)",
+    "deathYear": "347 BC",
+    "iepLink": "https://www.iep.utm.edu/plato/",
+    "birthYear": "427 BC",
+    "libriVoxIDs": [
+      "2707",
+      "8355",
+      "3485",
+      "5566",
+      "8603",
+      "7237"
+    ],
+    "id": "4B7B8E3A-A01C-41B5-89B7-F6464C64A104",
+    "school": "Platonism",
+    "libriVoxGetRequestLinks": [
+      "https://librivox.org/api/feed/audiobooks/?id=2707&extended=1&format=json",
+      "https://librivox.org/api/feed/audiobooks/?id=8355&extended=1&format=json",
+      "https://librivox.org/api/feed/audiobooks/?id=3485&extended=1&format=json",
+      "https://librivox.org/api/feed/audiobooks/?id=5566&extended=1&format=json",
+      "https://librivox.org/api/feed/audiobooks/?id=8603&extended=1&format=json",
+      "https://librivox.org/api/feed/audiobooks/?id=7237&extended=1&format=json"
+    ],
+    "username": "@plato",
+    "interests": "Rhetoric, Art, Literature, Epistemology, Justice, Virtue, Politics, Education, Family, Militarism",
+    "speLink": "https://plato.stanford.edu/entries/plato/",
+    "hasEBooks": true,
+    "wikiTitle": "Plato",
+    "images": {
+      "thumbnailIllustrations": {
+        "thumbnailIll50x50": "/Images/Plato-Ill-small.png",
+        "thumbnailIll100x100": "/Images/Plato-Ill-small@2x.png",
+        "thumbnailIll150x150": "/Images/Plato-Ill-small@3x.png"
+      },
+      "fullImages": {
+        "full1260x1680": "/Images/PlatoFull-iPhone@3x.jpg",
+        "full420x560": "/Images/PlatoFull-iPhone.jpg",
+        "full1200x1600": "/Images/PlatoFull@2x.jpg",
+        "full840x1120": "/Images/PlatoFull-iPhone@2x.jpg",
+        "full600x800": "/Images/PlatoFull.jpg"
+      },
+      "faceImages": {
+        "face750x750": "/Images/PlatoFace@3x.jpg",
+        "face500x500": "/Images/PlatoFace@2x.jpg",
+        "face250x250": "/Images/PlatoFace.jpg"
+      },
+      "illustrations": {
+        "ill500x500": "/Images/Plato-Ill@2x.png",
+        "ill250x250": "/Images/Plato-Ill.png",
+        "ill750x750": "/Images/Plato-Ill@3x.png"
+      }
+    },
+    "name": "Plato",
+    "_registry": {
+      "domain": "philosophy",
+      "api_name": "Plato",
+      "gutenberg_search": "Plato",
+      "gutenberg_author_slug": "plato",
+      "wikidata_label": "Plato"
+    },
+    "_academic_links": {
+      "stanford_sep": "https://plato.stanford.edu/entries/plato/",
+      "internet_iep": "https://www.iep.utm.edu/plato/",
+      "wikipedia": "https://en.wikipedia.org/wiki/Plato"
+    }
+  },
+  {
+    "life": "(1596-1650)",
+    "birthDate": "31 March 1596",
+    "deathYear": "1650 AD",
+    "iepLink": "https://www.iep.utm.edu/descarte/",
+    "birthYear": "1596 AD",
+    "libriVoxIDs": [
+      "269",
+      "1502"
+    ],
+    "id": "3C6BCB23-5C68-4F54-B680-BFF333FB6683",
+    "school": "Cartesianism",
+    "libriVoxGetRequestLinks": [
+      "https://librivox.org/api/feed/audiobooks/?id=269&extended=1&format=json",
+      "https://librivox.org/api/feed/audiobooks/?id=1502&extended=1&format=json"
+    ],
+    "username": "@realReneDescartes",
+    "interests": "Metaphysics, Epistemology, Mathematics",
+    "speLink": "https://plato.stanford.edu/entries/descartes/",
+    "hasEBooks": true,
+    "wikiTitle": "René Descartes",
+    "deathDate": "11 February 1650",
+    "name": "René Descartes",
+    "images": {
+      "faceImages": {
+        "face500x500": "/Images/Rene-DescartesFace@2x.jpg",
+        "face250x250": "/Images/Rene-DescartesFace.jpg",
+        "face750x750": "/Images/Rene-DescartesFace@3x.jpg"
+      },
+      "thumbnailIllustrations": {
+        "thumbnailIll150x150": "/Images/Rene-Descartes-Ill-small@3x.png",
+        "thumbnailIll50x50": "/Images/Rene-Descartes-Ill-small.png",
+        "thumbnailIll100x100": "/Images/Rene-Descartes-Ill-small@2x.png"
+      },
+      "illustrations": {
+        "ill250x250": "/Images/Rene-Descartes-Ill.png",
+        "ill750x750": "/Images/Rene-Descartes-Ill@3x.png",
+        "ill500x500": "/Images/Rene-Descartes-Ill@2x.png"
+      },
+      "fullImages": {
+        "full840x1120": "/Images/Rene-DescartesFull-iPhone@2x.jpg",
+        "full420x560": "/Images/Rene-DescartesFull-iPhone.jpg",
+        "full1200x1600": "/Images/Rene-DescartesFull@2x.jpg",
+        "full600x800": "/Images/Rene-DescartesFull.jpg",
+        "full1260x1680": "/Images/Rene-DescartesFull-iPhone@3x.jpg"
+      }
+    },
+    "_registry": {
+      "domain": "philosophy",
+      "api_name": "René Descartes",
+      "gutenberg_search": "Descartes",
+      "gutenberg_author_slug": "descartes",
+      "wikidata_label": "René Descartes"
+    },
+    "_academic_links": {
+      "stanford_sep": "https://plato.stanford.edu/entries/descartes/",
+      "internet_iep": "https://www.iep.utm.edu/descarte/",
+      "wikipedia": "https://en.wikipedia.org/wiki/René_Descartes"
+    }
+  },
+  {
+    "life": "(1724-1804)",
+    "birthDate": "22 April 1724",
+    "deathYear": "1804 AD",
+    "iepLink": "https://www.iep.utm.edu/kantview/",
+    "birthYear": "1724 AD",
+    "libriVoxIDs": [
+      "1318",
+      "11281",
+      "1664",
+      "602",
+      "508",
+      "936"
+    ],
+    "id": "8D0D5B08-94A1-401D-AF81-25377AEE86DA",
+    "school": "Kantianism",
+    "libriVoxGetRequestLinks": [
+      "https://librivox.org/api/feed/audiobooks/?id=1318&extended=1&format=json",
+      "https://librivox.org/api/feed/audiobooks/?id=11281&extended=1&format=json",
+      "https://librivox.org/api/feed/audiobooks/?id=1664&extended=1&format=json",
+      "https://librivox.org/api/feed/audiobooks/?id=602&extended=1&format=json",
+      "https://librivox.org/api/feed/audiobooks/?id=508&extended=1&format=json",
+      "https://librivox.org/api/feed/audiobooks/?id=936&extended=1&format=json"
+    ],
+    "username": "@immaculateImmanuel",
+    "interests": "Epistemology, Metaphysics, Ethics, Cosmogony",
+    "speLink": "https://plato.stanford.edu/entries/kant/",
+    "hasEBooks": true,
+    "wikiTitle": "Immanuel Kant",
+    "deathDate": "12 February 1804",
+    "name": "Immanuel Kant",
+    "images": {
+      "illustrations": {
+        "ill250x250": "/Images/Immanuel-Kant-Ill.png",
+        "ill750x750": "/Images/Immanuel-Kant-Ill@3x.png",
+        "ill500x500": "/Images/Immanuel-Kant-Ill@2x.png"
+      },
+      "faceImages": {
+        "face500x500": "/Images/Immanuel-KantFace@2x.jpg",
+        "face250x250": "/Images/Immanuel-KantFace.jpg",
+        "face750x750": "/Images/Immanuel-KantFace@3x.jpg"
+      },
+      "thumbnailIllustrations": {
+        "thumbnailIll50x50": "/Images/Immanuel-Kant-Ill-small.png",
+        "thumbnailIll150x150": "/Images/Immanuel-Kant-Ill-small@3x.png",
+        "thumbnailIll100x100": "/Images/Immanuel-Kant-Ill-small@2x.png"
+      },
+      "fullImages": {
+        "full600x800": "/Images/Immanuel-KantFull.jpg",
+        "full840x1120": "/Images/Immanuel-KantFull-iPhone@2x.jpg",
+        "full420x560": "/Images/Immanuel-KantFull-iPhone.jpg",
+        "full1260x1680": "/Images/Immanuel-KantFull-iPhone@3x.jpg",
+        "full1200x1600": "/Images/Immanuel-KantFull@2x.jpg"
+      }
+    },
+    "_registry": {
+      "domain": "philosophy",
+      "api_name": "Immanuel Kant",
+      "gutenberg_search": "Kant",
+      "gutenberg_author_slug": "kant",
+      "wikidata_label": "Immanuel Kant"
+    },
+    "_academic_links": {
+      "stanford_sep": "https://plato.stanford.edu/entries/kant/",
+      "internet_iep": "https://www.iep.utm.edu/kantview/",
+      "wikipedia": "https://en.wikipedia.org/wiki/Immanuel_Kant"
+    }
+  },
+  {
+    "life": "(1770-1831)",
+    "birthDate": "27 August 1770",
+    "deathYear": "1831 AD",
+    "iepLink": "https://www.iep.utm.edu/hegelsoc/",
+    "birthYear": "1770 AD",
+    "libriVoxIDs": [
+      "1670",
+      "10809"
+    ],
+    "id": "1180AEE2-37F0-4A03-A2F0-F8F63DD7A5E2",
+    "school": "Hegelianism",
+    "libriVoxGetRequestLinks": [
+      "https://librivox.org/api/feed/audiobooks/?id=1670&extended=1&format=json",
+      "https://librivox.org/api/feed/audiobooks/?id=10809&extended=1&format=json"
+    ],
+    "username": "@GWFHegel",
+    "interests": "Philosophy of History, Political Philosophy, Logic, Aesthetics, Religion, Metaphysics, Epistemology",
+    "speLink": "https://plato.stanford.edu/entries/hegel/",
+    "hasEBooks": true,
+    "wikiTitle": "Georg Wilhelm Friedrich Hegel",
+    "deathDate": "14 November 1831",
+    "name": "Georg Wilhelm Friedrich Hegel",
+    "images": {
+      "thumbnailIllustrations": {
+        "thumbnailIll50x50": "/Images/Georg-Wilhelm-Friedrich-Hegel-Ill-small.png",
+        "thumbnailIll150x150": "/Images/Georg-Wilhelm-Friedrich-Hegel-Ill-small@3x.png",
+        "thumbnailIll100x100": "/Images/Georg-Wilhelm-Friedrich-Hegel-Ill-small@2x.png"
+      },
+      "faceImages": {
+        "face750x750": "/Images/Georg-Wilhelm-Friedrich-HegelFace@3x.jpg",
+        "face500x500": "/Images/Georg-Wilhelm-Friedrich-HegelFace@2x.jpg",
+        "face250x250": "/Images/Georg-Wilhelm-Friedrich-HegelFace.jpg"
+      },
+      "fullImages": {
+        "full420x560": "/Images/Georg-Wilhelm-Friedrich-HegelFull-iPhone.jpg",
+        "full840x1120": "/Images/Georg-Wilhelm-Friedrich-HegelFull-iPhone@2x.jpg",
+        "full1200x1600": "/Images/Georg-Wilhelm-Friedrich-HegelFull@2x.jpg",
+        "full1260x1680": "/Images/Georg-Wilhelm-Friedrich-HegelFull-iPhone@3x.jpg",
+        "full600x800": "/Images/Georg-Wilhelm-Friedrich-HegelFull.jpg"
+      },
+      "illustrations": {
+        "ill250x250": "/Images/Georg-Wilhelm-Friedrich-Hegel-Ill.png",
+        "ill750x750": "/Images/Georg-Wilhelm-Friedrich-Hegel-Ill@3x.png",
+        "ill500x500": "/Images/Georg-Wilhelm-Friedrich-Hegel-Ill@2x.png"
+      }
+    },
+    "_registry": {
+      "domain": "philosophy",
+      "api_name": "Georg Wilhelm Friedrich Hegel",
+      "gutenberg_search": "Hegel",
+      "gutenberg_author_slug": "hegel",
+      "wikidata_label": "Georg Wilhelm Friedrich Hegel"
+    },
+    "_academic_links": {
+      "stanford_sep": "https://plato.stanford.edu/entries/hegel/",
+      "internet_iep": "https://www.iep.utm.edu/hegelsoc/",
+      "wikipedia": "https://en.wikipedia.org/wiki/Georg_Wilhelm_Friedrich_Hegel"
+    }
+  },
+  {
+    "life": "(1844-1900)",
+    "birthDate": "15 October 1844",
+    "topicalDescription": "Friedrich Nietzsche’s theory of power, authority, and truth posits that fact and reality are shaped by power. That truth does not  exist on some uncontested plain but is rather deeply enmeshed in power relations.",
+    "deathYear": "1900 AD",
+    "iepLink": "https://www.iep.utm.edu/nietzsch/",
+    "birthYear": "1844 AD",
+    "libriVoxIDs": [
+      "498",
+      "152",
+      "8703",
+      "5472",
+      "9854",
+      "2755",
+      "509",
+      "985"
+    ],
+    "id": "EEDE0B1A-815C-4456-8D2B-0D55028035F8",
+    "school": "Nietzschean",
+    "libriVoxGetRequestLinks": [
+      "https://librivox.org/api/feed/audiobooks/?id=498&extended=1&format=json",
+      "https://librivox.org/api/feed/audiobooks/?id=152&extended=1&format=json",
+      "https://librivox.org/api/feed/audiobooks/?id=8703&extended=1&format=json",
+      "https://librivox.org/api/feed/audiobooks/?id=5472&extended=1&format=json",
+      "https://librivox.org/api/feed/audiobooks/?id=9854&extended=1&format=json",
+      "https://librivox.org/api/feed/audiobooks/?id=2755&extended=1&format=json",
+      "https://librivox.org/api/feed/audiobooks/?id=509&extended=1&format=json",
+      "https://librivox.org/api/feed/audiobooks/?id=985&extended=1&format=json"
+    ],
+    "username": "@overman",
+    "interests": "Aesthetics, Ethics, Metaphysics, Nihilism, Psychology, Ontology, Poetry, Value Theory, Voluntarism, Tragedy, Fact–Value Distinction, Anti-Foundationalism, Philosophy of History",
+    "speLink": "https://plato.stanford.edu/entries/nietzsche/",
+    "hasEBooks": true,
+    "wikiTitle": "Friedrich Nietzsche",
+    "deathDate": "25 August 1900",
+    "name": "Friedrich Nietzsche",
+    "images": {
+      "illustrations": {
+        "ill500x500": "/Images/Friedrich-Nietzsche-Ill@2x.png",
+        "ill250x250": "/Images/Friedrich-Nietzsche-Ill.png",
+        "ill750x750": "/Images/Friedrich-Nietzsche-Ill@3x.png"
+      },
+      "fullImages": {
+        "full420x560": "/Images/Friedrich-NietzscheFull-iPhone.jpg",
+        "full840x1120": "/Images/Friedrich-NietzscheFull-iPhone@2x.jpg",
+        "full600x800": "/Images/Friedrich-NietzscheFull.jpg",
+        "full1200x1600": "/Images/Friedrich-NietzscheFull@2x.jpg",
+        "full1260x1680": "/Images/Friedrich-NietzscheFull-iPhone@3x.jpg"
+      },
+      "thumbnailIllustrations": {
+        "thumbnailIll100x100": "/Images/Friedrich-Nietzsche-Ill-small@2x.png",
+        "thumbnailIll50x50": "/Images/Friedrich-Nietzsche-Ill-small.png",
+        "thumbnailIll150x150": "/Images/Friedrich-Nietzsche-Ill-small@3x.png"
+      },
+      "faceImages": {
+        "face500x500": "/Images/Friedrich-NietzscheFace@2x.jpg",
+        "face250x250": "/Images/Friedrich-NietzscheFace.jpg",
+        "face750x750": "/Images/Friedrich-NietzscheFace@3x.jpg"
+      }
+    },
+    "_registry": {
+      "domain": "philosophy",
+      "api_name": "Friedrich Nietzsche",
+      "gutenberg_search": "Nietzsche",
+      "gutenberg_author_slug": "nietzsche",
+      "wikidata_label": "Friedrich Nietzsche"
+    },
+    "_academic_links": {
+      "stanford_sep": "https://plato.stanford.edu/entries/nietzsche/",
+      "internet_iep": "https://www.iep.utm.edu/nietzsch/",
+      "wikipedia": "https://en.wikipedia.org/wiki/Friedrich_Nietzsche"
+    }
+  }
+]

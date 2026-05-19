@@ -30,3 +30,17 @@ RUN pip install --no-cache-dir \
     "python-dotenv>=1.0" \
     "deltalake>=0.18" \
     "requests>=2.31"
+
+# Exploitation Zone embedding job (corpus_chunks.py). torch is pinned to the
+# CPU-only wheel so the image stays ~1 GB lighter (no CUDA) — this stack runs
+# embedding on CPU in local-mode Spark.
+RUN pip install --no-cache-dir \
+      --extra-index-url https://download.pytorch.org/whl/cpu \
+      "torch>=2.0,<3.0" \
+ && pip install --no-cache-dir \
+      "sentence-transformers>=3.0.0" \
+      "pymilvus>=2.4.0,<2.5.0"
+
+# Consumption Zone — Anthropic-backed LLM client (consumption/llm.py).
+# Separate layer so the heavy torch/ST/pymilvus layers above stay cached.
+RUN pip install --no-cache-dir "anthropic>=0.40.0"
