@@ -73,23 +73,72 @@ class IdentityCard:
     description: Optional[str]          # "German-born theoretical physicist…"
     summary: Optional[str]             # Wikipedia extract — universal anchor
     school: Optional[str] = None       # philosophers only (else NULL)
-    born: Optional[int] = None
+    born: Optional[int] = None         # signed year; BC = negative
     died: Optional[int] = None
+    birth_date_full: Optional[str] = None   # curated full date, if known
+    death_date_full: Optional[str] = None
     interests: Optional[str] = None
     wikipedia_link: Optional[str] = None
+
+    # ── derived, from curated data only (no fabrication) ──────────────────
+    def _year_str(self, y: Optional[int]) -> str:
+        if y is None:
+            return "?"
+        return f"{-y} BC" if y < 0 else str(y)
+
+    def lifespan(self) -> Optional[int]:
+        """Years lived — the meaningful 'age' for a historical figure.
+        Signed years make BC arithmetic correct (Plato −428→−348 = 80)."""
+        if self.born is None or self.died is None:
+            return None
+        return self.died - self.born
+
+    def era_line(self) -> str:
+        """One curated biographical line: full dates if we ingested them,
+        else years; plus lifespan when both endpoints are known."""
+        b = self.birth_date_full or self._year_str(self.born)
+        d = self.death_date_full or self._year_str(self.died)
+        line = f"Lived: {b} – {d}"
+        span = self.lifespan()
+        if span is not None:
+            line += f" (lived {span} years)"
+        return line
 
     def as_brief(self) -> str:
         """Compact factual block for the prompt header."""
         bits = [f"{self.name} — {self.description or self.domain}"]
+        if self.born is not None or self.died is not None:
+            bits.append(self.era_line())
         if self.school:
             bits.append(f"School: {self.school}")
-        if self.born or self.died:
-            bits.append(f"Era: {self.born or '?'}–{self.died or '?'}")
         if self.interests:
             bits.append(f"Interests: {self.interests}")
         if self.summary:
             bits.append(self.summary)
         return "\n".join(bits)
+
+    def voice_descriptor(self) -> str:
+        """A delivery-oriented brief built ONLY from ingested/curated fields.
+
+        Used now to colour the spoken register of the text answer, and
+        intended as the seed for the future TTS voice generator. We do NOT
+        assert a native language or accent — that would be invented. The
+        Wikipedia *description* already encodes origin + role (e.g.
+        "German-born theoretical physicist"); the model/TTS step infers
+        register from that grounded phrase plus the era, nothing fabricated.
+        """
+        parts = [f"Speaker: {self.name}."]
+        if self.description:
+            parts.append(f"Identity (Wikipedia): {self.description}.")
+        if self.born is not None or self.died is not None:
+            parts.append(self.era_line() + ".")
+        if self.school:
+            parts.append(f"Intellectual school: {self.school}.")
+        parts.append(
+            "Let period and stated origin colour the cadence and register; "
+            "do not invent an accent or biographical facts not given above."
+        )
+        return " ".join(parts)
 
 
 @dataclass
@@ -130,7 +179,8 @@ def load_identity_card(figure_slug: str) -> IdentityCard:
     row = con.execute(
         """
         SELECT figure_slug, name, domain, wikipedia_description,
-               wikipedia_summary, school, born, died, interests, wikipedia_link
+               wikipedia_summary, school, born, died,
+               birth_date_full, death_date_full, interests, wikipedia_link
         FROM dim_figure WHERE figure_slug = ?
         """,
         [figure_slug],
@@ -141,7 +191,9 @@ def load_identity_card(figure_slug: str) -> IdentityCard:
     return IdentityCard(
         figure_slug=row[0], name=row[1], domain=row[2],
         description=row[3], summary=row[4], school=row[5],
-        born=row[6], died=row[7], interests=row[8], wikipedia_link=row[9],
+        born=row[6], died=row[7],
+        birth_date_full=row[8], death_date_full=row[9],
+        interests=row[10], wikipedia_link=row[11],
     )
 
 
@@ -273,6 +325,8 @@ def render_prompt(g: Grounding,
         f"You are {g.card.name}, being interviewed on a podcast. Answer in "
         f"the first person, in character, concise and quotable.\n\n"
         f"WHO YOU ARE:\n{g.card.as_brief()}\n\n"
+        f"HOW YOU CARRY YOURSELF (bio-grounded delivery):\n"
+        f"{g.card.voice_descriptor()}\n\n"
         f"GROUND YOUR ANSWER ONLY IN THESE PASSAGES FROM YOUR OWN WORK "
         f"(cite them inline as [n]); if they don't cover the question, say "
         f"so in character rather than inventing:\n{evidence}"
