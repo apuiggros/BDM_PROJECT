@@ -1,10 +1,28 @@
 # 🏛️ Historical Conversational AI — Data Lakehouse Pipeline
-### Big Data Management (BDM) — P1: Cold-Path Ingestion & Bronze Landing Zone
+### Big Data Management (BDM) — P1 (Landing Zone) + P2 (Trusted, Exploitation, Consumption)
+
+> **Project status — 2026-05-20**
+> P1 delivered (graded **9.5/10**). P2 design submitted; implementation of the Trusted, Exploitation, and Consumption zones is **largely done and running end-to-end on the batch side**. Streaming integration with the hot path is the remaining seam (coordinated with Santi). P2 deadline: **2026-06-09**.
+>
+> **Current architecture (post-P2 design):**
+> - **Landing** — MinIO (raw bytes, one prefix per source). **Unchanged from P1.**
+> - **Trusted** — DuckDB (`duckdb/trusted.duckdb`). 11 cleaned tables. One row per source record, typed, deduped. **Built by `bdm_p2_trusted_zone_dag`.**
+> - **Exploitation** — DuckDB star schema (`duckdb/exploit.duckdb`) + Milvus vector store (`corpus_chunks`). `dim_figure` + 4 fact tables + RAG corpus. **Built by `bdm_p2_exploitation_zone_dag`, auto-triggered from Trusted.**
+> - **Consumption** — Conversational podcast interview (Reasoner / Voice / Interviewer / Episode composer), Claude as provider-swappable LLM. Outputs Markdown episodes to `consumption/episodes/`.
+>
+> **Note on the P1 Delta tables:** the `bronze_tables/` Delta Lake layer described below is **deprecated** as of P2. All tabular state now lives in DuckDB (trusted + exploitation), and all vector state lives in Milvus. MongoDB was dropped during P2 design — every tool is justified by a downstream consumer (see `documents/P2_TECHNICAL_REPORT.pdf` §7, §9).
 
 ---
 
 ## 📋 Table of Contents
 
+**P2 (current)**
+0. [P2 Status & Zone Overview](#-p2-status--zone-overview)
+   - [Trusted Zone](#trusted-zone)
+   - [Exploitation Zone](#exploitation-zone)
+   - [Consumption Zone](#consumption-zone)
+
+**P1 (landing zone — still in production for cold-path ingestion)**
 1. [End Goal & Motivation](#-end-goal--motivation)
 2. [Architecture Overview](#-architecture-overview)
 3. [Infrastructure Deep Dive](#-infrastructure-deep-dive)
@@ -17,6 +35,57 @@
 10. [Running the Pipeline](#-running-the-pipeline)
 11. [Testing Scripts Locally](#-testing-scripts-locally)
 12. [Key Engineering Decisions](#-key-engineering-decisions)
+
+---
+
+## 🚦 P2 Status & Zone Overview
+
+```
+   MinIO (landing)  ──►  DuckDB (trusted)  ──►  DuckDB star (exploit)  ──►  Consumption agents
+                            │                       │
+                            │                       └──►  Milvus (corpus_chunks, 384-d, HNSW/COSINE)
+                            │
+                            └──►  Spark job (chunker+embedder) writes Milvus
+```
+
+| Zone | Storage | Built by | Status |
+|---|---|---|---|
+| Landing | MinIO `landing-zone/` | `bdm_p1_cold_path_ingestion` (P1 DAG, daily) | ✅ Done (P1) |
+| Trusted | DuckDB `duckdb/trusted.duckdb` (11 tables) | `bdm_p2_trusted_zone_dag` | ✅ Done |
+| Exploitation (tabular) | DuckDB `duckdb/exploit.duckdb` (`dim_figure` + 4 facts) | `bdm_p2_exploitation_zone_dag` | ✅ Done |
+| Exploitation (vector) | Milvus `corpus_chunks` collection | Spark job inside the same DAG | ✅ Done |
+| Consumption | `consumption/agents/*.py` + Markdown episodes | Manual / on-demand for now | ✅ Done (batch) |
+| Streaming seam | Kafka → Spark Structured Streaming → `fact_mentions_1m` | Santi's branch | ⏳ Pending merge |
+
+> **Full P2 walkthrough:** see `documents/P2_TECHNICAL_REPORT.pdf` (10 pages — architecture diagram, datasource usage matrix, full star schema, consumption sequence diagram, design-decision register).
+
+### Trusted Zone
+- **Code:** `cleaning/structured/` (6 SQL-based cleaners) + `cleaning/unstructured/` (3 byte-level cleaners).
+- **Output:** `duckdb/trusted.duckdb` — one cleaned table per source (e.g. `trusted_wiki_pages`, `trusted_works`, `trusted_quotes`, `trusted_news_articles`, `trusted_se_qa`, `trusted_philosophers`, `trusted_gutenberg_catalog`, `trusted_podcast_episodes`, plus image/text content tables).
+- **Contract:** typed columns, deduped on a stable natural key, `figure_slug` joined back to the registry where applicable.
+- **Schemas documented in:** `cleaning/SCHEMAS.md`.
+- **DAG:** `orchestration/bdm_p2_trusted_zone_dag.py`. On success, triggers the exploitation DAG via `TriggerDagRunOperator`.
+
+### Exploitation Zone
+- **Code:** `exploitation/structured/` — `dim_figure.py`, `fact_works.py`, `fact_quotes.py`, `fact_news_articles.py`, `fact_se_qa.py`, `corpus_chunks.py`.
+- **Tabular output:** `duckdb/exploit.duckdb` — classic star schema with `dim_figure` (9 figures) at the center and four fact tables (`fact_works`, `fact_quotes`, `fact_news_articles`, `fact_se_qa`). Fact builds are serialized via `chain()` because DuckDB is a single-writer engine.
+- **Vector output:** Milvus `corpus_chunks` collection — 384-d `sentence-transformers/all-MiniLM-L6-v2` embeddings, HNSW index (`M=16`, `efConstruction=200`), COSINE metric, ~220-word chunks with 40-word overlap. **Built by a Spark job** (the only place we use Spark — justified by per-row chunking + embedding fan-out).
+- **DAG:** `orchestration/bdm_p2_exploitation_zone_dag.py`.
+
+### Consumption Zone
+- **Code:** `consumption/agents/`
+  - `reasoner.py` — RAG retrieval against Milvus + DuckDB joins; builds the identity card with `voice_descriptor()` derived from the curated Wikipedia summary (no fabricated columns).
+  - `voice.py` — character-as-themselves response generation.
+  - `interviewer.py` — adaptive follow-ups, history threading, content-safety curation.
+  - `episode.py` — composes the final Markdown episode under `consumption/episodes/`.
+- **LLM:** `consumption/llm.py` — provider-swappable `llm_fn`; default is Anthropic Claude (`claude-sonnet-4-6`).
+- **Status:** runs end-to-end for any of the 9 figures from a curated opener through ~10 turns. TTS / audio rendering is the next deferred milestone.
+
+---
+
+## P1 Reference Documentation
+
+Everything below documents the **P1 landing zone**, which is still the canonical cold-path ingestion layer feeding the Trusted Zone. The text is preserved as-delivered for P1; treat the Delta Lake / `bronze_tables/` references as historical — that layer is no longer wired into downstream consumers.
 
 ---
 
@@ -494,7 +563,38 @@ P1/
 │   └── metadata_to_delta.py       # JSON → Delta Lake (Lakehouse conversion)
 │
 ├── orchestration/                 # Airflow DAG definitions
-│   └── bdm_p1_pipeline_dag.py     # Daily batch DAG (7 parallel tasks + delta conversion)
+│   ├── bdm_p1_pipeline_dag.py     # P1: Daily landing-zone ingestion DAG
+│   ├── bdm_p2_trusted_zone_dag.py # P2: Landing → Trusted (DuckDB) cleaners
+│   └── bdm_p2_exploitation_zone_dag.py  # P2: Trusted → Star + Milvus (Spark)
+│
+├── cleaning/                      # P2 Trusted Zone — landing → DuckDB
+│   ├── SCHEMAS.md
+│   ├── structured/                # SQL-based cleaners (one per JSON source)
+│   └── unstructured/              # Byte-level cleaners (texts, images, audio)
+│
+├── exploitation/                  # P2 Exploitation Zone — Trusted → star + vectors
+│   └── structured/
+│       ├── dim_figure.py
+│       ├── fact_works.py
+│       ├── fact_quotes.py
+│       ├── fact_news_articles.py
+│       ├── fact_se_qa.py
+│       └── corpus_chunks.py       # Spark job → Milvus
+│
+├── consumption/                   # P2 Consumption Zone — conversational podcast
+│   ├── agents/
+│   │   ├── reasoner.py            # RAG + identity card + voice_descriptor
+│   │   ├── voice.py
+│   │   ├── interviewer.py
+│   │   └── episode.py
+│   ├── llm.py                     # Provider-swappable Claude wrapper
+│   └── episodes/                  # Generated Markdown episodes (gitignored)
+│
+├── duckdb/                        # P2 DuckDB files (gitignored — regenerable)
+│   ├── trusted.duckdb
+│   └── exploit.duckdb
+│
+├── documents/                     # Design docs + P2 technical report (PDF)
 │
 └── landing_zone/                  # Host-side persistent data directory
     └── landing-zone/              # Mirrors the MinIO bucket structure
