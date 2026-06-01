@@ -33,9 +33,8 @@
 5. [DAG Orchestration](#-dag-orchestration)
 6. [Data Organization in the Landing Zone](#-data-organization-in-the-landing-zone)
 7. [Project Structure](#-project-structure)
-8. [Requirements & Pre-requisites](#-requirements--pre-requisites)
-9. [Step-by-Step Setup Tutorial](#-step-by-step-setup-tutorial)
-10. [Running the Pipeline](#-running-the-pipeline)
+8. [Deploy the stack](#-deploy-the-stack) — prerequisites, build, run, daily ops
+9. [Running the Pipeline (detailed)](#-running-the-pipeline)
 11. [Testing Scripts Locally](#-testing-scripts-locally)
 12. [Key Engineering Decisions](#-key-engineering-decisions)
 
@@ -647,109 +646,100 @@ P1/
 
 ---
 
-## ⚙️ Requirements & Pre-requisites
+## 🚀 Deploy the stack
 
-### System Requirements
-- **Operating System:** Linux, macOS, or Windows (WSL2 recommended)
-- **Docker Engine:** >= 24.x with Docker Compose plugin (or `docker-compose` v2)
-- **Python:** 3.10 or higher (only needed for local testing outside Airflow)
-- **Disk Space:** ~5 GB recommended for Docker images and landing zone data
+The whole pipeline — Landing → Trusted → Exploitation → Consumption, plus the BI dashboard and Milvus — stands up from a clean clone with two commands. The `Makefile` wraps every common operation in a one-liner; you don't need anything on the host except **Docker** and **GNU make**.
 
-### API Keys Required
+### Prerequisites
 
-| Service | Key Variable | How to Get |
-|---|---|---|
-| GNews API | `NEWS_API_KEY` | Register at [gnews.io](https://gnews.io/) → Free tier gives 100 req/day |
+| Requirement | Notes |
+|---|---|
+| **Docker Engine ≥ 24** (with the `docker compose` v2 plugin) | Tested on Docker Desktop / Linux Docker. WSL2 works on Windows. |
+| **GNU make** | `make` on macOS/Linux; on Windows use WSL2 or run the equivalent commands by hand (see `Makefile`). |
+| **Memory** | **8 GB RAM minimum, 16 GB recommended.** Milvus standalone alone wants ~2 GB; the corpus_chunks embedding job needs another ~2 GB; Airflow, Streamlit, Postgres and Kafka share the rest. |
+| **Disk** | ~7 GB for the airflow-spark image + ~2 GB landing zone data + Milvus data once embeddings are built. |
+| **Ports** | `8080` (Airflow), `8085` (Kafka UI), `8501` (Streamlit), `9000`/`9001` (MinIO API/Console), `9092` (Kafka), `19530`/`9091` (Milvus). Make sure none are bound. |
+| **API keys (optional)** | `NEWS_API_KEY` (GNews, free 100 req/day) and `ANTHROPIC_API_KEY` (Claude). Without them the rest of the pipeline still runs — only the news ingester and the LLM-backed podcast generation degrade. |
 
-> The Philosophers API, Project Gutenberg/Gutendex, Wikipedia, Wikiquote, and Stack Exchange are completely **public and require no authentication**.
-
-### Python Dependencies (`requirements.txt`)
-```
-requests>=2.31.0             # HTTP client for all API calls
-pandas>=2.0.0                # Data analysis and manipulation
-boto3>=1.34.0                # AWS SDK — used to talk to MinIO (S3-compatible)
-python-dotenv>=1.0.0         # Loads .env into os.environ
-apache-airflow>=2.9.0        # Workflow orchestration
-deltalake>=0.17.0            # Delta Lake format support
-pyarrow>=15.0.0              # Parquet storage underpinning
-kafka-python-ng>=2.2.0       # Kafka client (Producer/Consumer)
-```
-
----
-
-## 🚀 Step-by-Step Setup Tutorial
-
-### Step 1: Clone the Repository
+### Step 1 — clone + configure
 ```bash
 git clone <your-repo-url>
 cd P1
+cp .env.example .env
+# edit .env: paste your NEWS_API_KEY and ANTHROPIC_API_KEY if you have them
 ```
 
-### Step 2: Create the `.env` File
-Create a file named `.env` in the root of the project. This is the only manual configuration step required:
+`.env.example` is the **single source of truth** for every env var the codebase reads — copy it, fill the two API keys, you're done. Everything else has sensible defaults.
 
-```ini
-# ─── MinIO Object Store ────────────────────────────────────────────────────
-# Use localhost:9000 for local testing; Airflow uses minio:9000 internally
-MINIO_ENDPOINT=localhost:9000
-MINIO_ACCESS_KEY=admin
-MINIO_SECRET_KEY=password
-MINIO_BUCKET=landing-zone
-
-# ─── Kafka ──────────────────────────────────────────────────────────────────
-KAFKA_BOOTSTRAP_SERVERS=localhost:9092
-
-# ─── External API Keys ─────────────────────────────────────────────────────
-NEWS_API_KEY=YOUR_GNEWS_API_KEY_HERE
-```
-
-> ⚠️ **Never commit this file to Git.** It is already listed in `.gitignore`.
-
-### Step 3: Launch the Full Stack
+### Step 2 — build + boot
 ```bash
-docker compose up -d
+make build   # one-time: build the custom airflow-spark image (~5 GB, ~5 min)
+make up      # start the 12-container stack
 ```
 
-This single command boots:
-- PostgreSQL (Airflow metadata DB)
-- MinIO (object store + auto-creates the `landing-zone` bucket)
-- Apache Airflow Webserver & Scheduler
-- Zookeeper, Kafka & Kafka UI (hot-path streaming)
+`make build` builds the `bdm/airflow-spark:2.9.0` image (Airflow 2.9 + Java 17 + PySpark + DuckDB + sentence-transformers + pymilvus + anthropic SDK + kafka-python). Subsequent `make up` calls reuse the cached image and take ~90 seconds to pass all health checks.
 
-> 🕐 **First boot takes ~60-90 seconds** for the Airflow Webserver to run `db migrate`, create the admin user, and pass its health check before the Scheduler starts.
-
-You can watch the health in real time with:
+Watch the boot:
 ```bash
-docker compose ps
+make ps     # show container status until everything is (healthy)
 ```
-All 8 services should show `healthy` or `exited (0)` (for `minio-init`, which finishes immediately after creating the bucket).
 
-### Step 4: Access the UIs
+Once everything is up, open the four UIs:
 
 | Service | URL | Credentials |
 |---|---|---|
-| Airflow Web UI | [http://localhost:8080](http://localhost:8080) | user: `admin` / pass: `admin` |
-| MinIO Console | [http://localhost:9001](http://localhost:9001) | user: `admin` / pass: `password` |
-| Kafka UI | [http://localhost:8085](http://localhost:8085) | (no auth required) |
+| **Streamlit dashboard** | http://localhost:8501 | — |
+| Airflow Web UI | http://localhost:8080 | `admin` / `admin` |
+| MinIO Console | http://localhost:9001 | `admin` / `password` |
+| Kafka UI | http://localhost:8085 | — |
 
----
+### Step 3 — run the pipeline
 
-## 🔄 Running the Pipeline
+The Trusted DAG auto-triggers the Exploitation DAG, so a single ingest + trusted run pulls everything through.
 
-### Via the Airflow UI (Automated)
-1. Open [http://localhost:8080](http://localhost:8080) and log in.
-2. Find the DAG `bdm_p1_cold_path_ingestion` in the list.
-3. **Unpause it** using the toggle on the left side.
-4. Click the **▶ Run** button (the play icon) to trigger a manual execution.
-5. Click on the DAG name → **Graph View** to see the tasks executing in parallel.
-
-Each task will turn **green** on success and **red** on failure. Click any task → **Log** tab to see the full real-time output from the ingestion script.
-
-### Via the Command Line (Manual, for testing)
-You can trigger a DAG run directly:
 ```bash
-docker exec airflow-scheduler airflow dags trigger bdm_p1_cold_path_ingestion
+# 1. cold-path ingestion (8 sources → MinIO landing zone)
+make ingest-p1
+
+# 2. Trusted zone (cleaning) — auto-triggers Exploitation when green
+make trusted
+
+# 3. (optional) start the streaming hot path
+make stream-up           # producer + Spark Structured Streaming
+# … later …
+make stream-down
+
+# 4. (optional, requires ANTHROPIC_API_KEY) generate one podcast episode
+make episode FIG=kant
 ```
+
+Verify each zone's data quality with the gates that the DAGs use:
+```bash
+make verify-trusted      # row counts + key constraints in trusted.duckdb
+make verify-exploit      # star-schema integrity in exploit.duckdb
+make verify-milvus       # corpus_chunks collection sanity
+```
+
+Open the **Streamlit dashboard** at http://localhost:8501 — every tab is populated as soon as its zone has run. Tabs degrade gracefully if their source isn't ready yet.
+
+### Step 4 — daily ops + teardown
+
+```bash
+make logs s=airflow-scheduler   # follow logs of any service
+make down                       # stop everything; data persists in volumes + ./duckdb/
+make clean                      # stop + wipe Milvus + Airflow DB + DuckDB files (NOT the landing zone)
+```
+
+The complete list of targets is in [`Makefile`](Makefile); `make help` prints it.
+
+### Portability notes
+
+| What's portable | What's host-coupled |
+|---|---|
+| Every script runs **inside the airflow-scheduler container** — host needs no Python, Spark, or Java. | The landing-zone MinIO data is bind-mounted from `./landing_zone/` on the host; the path is in `docker-compose.yml`. |
+| The build (`make build`) produces the same image on macOS, Linux, and Windows (WSL2). | The Streamlit container compiles `torch` + `sentence-transformers` on first boot — that takes ~5 min the first time, ~5 sec on subsequent restarts (pip cache). |
+| `.env` is the single config surface. Container-internal hostnames (`minio:9000`, `milvus:19530`, `kafka:29092`) are baked into `docker-compose.yml` and override the host-localhost defaults from `.env`. | The `bdm/airflow-spark:2.9.0` image is **not on Docker Hub** — it must be built locally with `make build`. |
+| The pipeline is **idempotent at every stage**: re-running any DAG, the streaming job, or the embedding job overwrites the previous output cleanly. | First-time HuggingFace model download (~80 MB for `all-MiniLM-L6-v2`) requires internet and gets cached in the container. |
 
 ---
 
