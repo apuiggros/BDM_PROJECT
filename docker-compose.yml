@@ -167,6 +167,7 @@ services:
     volumes:
       - ./streamlit_app:/app
       - ./trusted:/repo/trusted
+      - ./data:/app/data
     ports:
       - "8501:8501"
     environment:

@@ -1,8 +1,10 @@
 import os
 import boto3
+import json
 import pandas as pd
 import streamlit as st
 from botocore.client import Config
+from pathlib import Path
 
 st.set_page_config(page_title="BDM Project Dashboard", layout="wide")
 
@@ -106,3 +108,35 @@ if parquet_files:
 
 else:
     st.warning("No streaming parquet files detected.")
+
+st.header("Reddit Philosophy Sample Mentions")
+
+try:
+    with open(
+        "/app/data/samples/reddit_philosophy_mentions.json",
+        "r",
+        encoding="utf-8"
+    ) as f:
+        reddit_data = json.load(f)
+
+    reddit_df = pd.DataFrame(reddit_data)
+
+    st.dataframe(reddit_df)
+
+except Exception as e:
+    st.warning(f"Could not load Reddit sample data: {e}")
+    
+st.header("Reddit Philosophy Mentions")
+
+reddit_path = Path("/app/data/samples/reddit_philosophy_mentions.json")
+
+if reddit_path.exists():
+    with reddit_path.open("r", encoding="utf-8") as f:
+        reddit_data = json.load(f)
+
+    reddit_df = pd.DataFrame(reddit_data)
+
+    st.metric("Reddit Posts Retrieved", len(reddit_df))
+    st.dataframe(reddit_df, use_container_width=True)
+else:
+    st.warning("No Reddit sample data found. Run ingestion/reddit_retriever.py first.")

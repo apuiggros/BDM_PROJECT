@@ -42,3 +42,10 @@ airflow_settings.yaml
 dist/
 build/
 *.egg-info/
+
+# ─── Trusted Zone (curated data and models) ───────────────────────────────────
+trusted/streaming/
+*.parquet
+*.crc
+consumer.log
+producer.log
