@@ -29,7 +29,8 @@ RUN pip install --no-cache-dir \
     "pandas>=2.0" \
     "python-dotenv>=1.0" \
     "deltalake>=0.18" \
-    "requests>=2.31"
+    "requests>=2.31" \
+    "kafka-python-ng>=2.2.0"
 
 # Exploitation Zone embedding job (corpus_chunks.py). torch is pinned to the
 # CPU-only wheel so the image stays ~1 GB lighter (no CUDA) — this stack runs

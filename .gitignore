@@ -24,6 +24,12 @@ landing_zone/
 # Output of the Trusted Zone cleaning jobs. Regenerated from the landing zone.
 duckdb/
 
+# ─── Streaming Zone — Spark Structured Streaming output ───────────────────────
+# Parquet files + checkpoints written by ingestion/spark_stream_mentions_1m.py.
+# Regenerated at runtime; not part of source.
+streaming/*
+!streaming/.gitkeep
+
 # ─── Jupyter / IPython ────────────────────────────────────────────────────────
 .ipynb_checkpoints/
 *.ipynb

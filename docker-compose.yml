@@ -40,6 +40,9 @@ x-airflow-common: &airflow-common
     - ./scripts:/opt/airflow/scripts
     # DuckDB output directory (host-readable so we can inspect results)
     - ./duckdb:/opt/airflow/duckdb
+    # Streaming parquet output (Spark Structured Streaming job writes here,
+    # Streamlit dashboard + exploit.duckdb view read from here)
+    - ./streaming:/opt/airflow/streaming
     # Persistent Airflow logs
     - airflow_logs:/opt/airflow/logs
   env_file:
@@ -237,6 +240,37 @@ services:
       milvus-etcd:
         condition: service_healthy
       milvus-minio:
+        condition: service_healthy
+
+  # ── Streamlit dashboard (BI seam over all four zones) ──────────────────────
+  # Single-page app that surfaces Landing/Trusted/Exploitation/Streaming/Milvus/
+  # Consumption. Read-only against duckdb, streaming parquet, and Milvus.
+  streamlit:
+    image: python:3.11-slim
+    container_name: streamlit-dashboard
+    working_dir: /app
+    volumes:
+      - ./streamlit_app:/app
+      - ./duckdb:/opt/airflow/duckdb:ro
+      - ./streaming:/opt/airflow/streaming:ro
+      - ./consumption:/opt/airflow/consumption:ro
+    ports:
+      - "8501:8501"
+    environment:
+      - MINIO_ENDPOINT=http://minio:9000
+      - MINIO_ACCESS_KEY=admin
+      - MINIO_SECRET_KEY=password
+      - MINIO_BUCKET=landing-zone
+      - DUCKDB_DIR=/opt/airflow/duckdb
+      - STREAM_OUTPUT_PATH=/opt/airflow/streaming/fact_mentions_1m
+      - EPISODES_DIR=/opt/airflow/consumption/episodes
+      - MILVUS_HOST=milvus
+      - MILVUS_PORT=19530
+    command: >
+      bash -c "pip install --no-cache-dir -r requirements.txt &&
+               streamlit run app.py --server.port=8501 --server.address=0.0.0.0"
+    depends_on:
+      minio:
         condition: service_healthy
 
 # ─── Named Volumes ────────────────────────────────────────────────────────────

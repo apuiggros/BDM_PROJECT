@@ -52,10 +52,11 @@
 |---|---|---|---|
 | Landing | MinIO `landing-zone/` | `bdm_p1_cold_path_ingestion` (P1 DAG, daily) | ✅ Done (P1) |
 | Trusted | DuckDB `duckdb/trusted.duckdb` (11 tables) | `bdm_p2_trusted_zone_dag` | ✅ Done |
-| Exploitation (tabular) | DuckDB `duckdb/exploit.duckdb` (`dim_figure` + 4 facts) | `bdm_p2_exploitation_zone_dag` | ✅ Done |
+| Exploitation (tabular) | DuckDB `duckdb/exploit.duckdb` (`dim_figure` + 6 facts: works/quotes/news/SE/HN/mentions) | `bdm_p2_exploitation_zone_dag` | ✅ Done |
 | Exploitation (vector) | Milvus `corpus_chunks` collection | Spark job inside the same DAG | ✅ Done |
 | Consumption | `consumption/agents/*.py` + Markdown episodes | Manual / on-demand for now | ✅ Done (batch) |
-| Streaming seam | Kafka → Spark Structured Streaming → `fact_mentions_1m` | Santi's branch | ⏳ Pending merge |
+| Streaming seam | Kafka → Spark Structured Streaming → parquet → `fact_mentions_1m` view | `ingestion/spark_stream_mentions_1m.py` + `exploitation/structured/fact_mentions_1m.py` | ✅ Done |
+| Dashboard (BI) | Streamlit on port 8501, all six zones tabbed | `streamlit_app/app.py` | ✅ Done |
 
 > **Full P2 walkthrough:** see `documents/P2_TECHNICAL_REPORT.pdf` (10 pages — architecture diagram, datasource usage matrix, full star schema, consumption sequence diagram, design-decision register).
 
@@ -67,8 +68,8 @@
 - **DAG:** `orchestration/bdm_p2_trusted_zone_dag.py`. On success, triggers the exploitation DAG via `TriggerDagRunOperator`.
 
 ### Exploitation Zone
-- **Code:** `exploitation/structured/` — `dim_figure.py`, `fact_works.py`, `fact_quotes.py`, `fact_news_articles.py`, `fact_se_qa.py`, `corpus_chunks.py`.
-- **Tabular output:** `duckdb/exploit.duckdb` — classic star schema with `dim_figure` (9 figures) at the center and four fact tables (`fact_works`, `fact_quotes`, `fact_news_articles`, `fact_se_qa`). Fact builds are serialized via `chain()` because DuckDB is a single-writer engine.
+- **Code:** `exploitation/structured/` — `dim_figure.py`, `fact_works.py`, `fact_quotes.py`, `fact_news_articles.py`, `fact_se_qa.py`, `fact_hn_stories.py`, `fact_mentions_1m.py`, `corpus_chunks.py`.
+- **Tabular output:** `duckdb/exploit.duckdb` — classic star schema with `dim_figure` (9 figures) at the center and six fact tables/views: `fact_works`, `fact_quotes`, `fact_news_articles`, `fact_se_qa`, `fact_hn_stories` (P2 addition — Hacker News discourse signal), and `fact_mentions_1m` (streaming view). Fact builds are serialized via `chain()` because DuckDB is a single-writer engine.
 - **Vector output:** Milvus `corpus_chunks` collection — 384-d `sentence-transformers/all-MiniLM-L6-v2` embeddings, HNSW index (`M=16`, `efConstruction=200`), COSINE metric, ~220-word chunks with 40-word overlap. **Built by a Spark job** (the only place we use Spark — justified by per-row chunking + embedding fan-out).
 - **DAG:** `orchestration/bdm_p2_exploitation_zone_dag.py`.
 
@@ -80,6 +81,35 @@
   - `episode.py` — composes the final Markdown episode under `consumption/episodes/`.
 - **LLM:** `consumption/llm.py` — provider-swappable `llm_fn`; default is Anthropic Claude (`claude-sonnet-4-6`).
 - **Status:** runs end-to-end for any of the 9 figures from a curated opener through ~10 turns. TTS / audio rendering is the next deferred milestone.
+
+### Hacker News Source (P2 addition)
+- **Why HN, not Reddit:** Reddit's unauthenticated search endpoint started returning browser-check HTML pages (HTTP 403) for all programmatic clients in 2026, and OAuth requires per-account "Responsible Builder Policy" gating that several team accounts couldn't pass. We pivoted to the HN Algolia API: open, no auth, no key, and — most importantly — HN's audience genuinely discusses the 9 figures with much higher signal-to-noise (the top "Immanuel Kant" result is a 242-point philosophy primer on ralphammer.com; the top Reddit result was a Spanish "chimichanga" food post).
+- **Ingester:** `ingestion/hackernews_ingest.py` — quoted-phrase search per figure (`q="Immanuel Kant"` etc.), `tags=story`, 25 hits each, daily snapshot to `s3://landing-zone/hackernews/raw_json/YYYY-MM-DD.json`. Registry-driven; no per-figure code paths.
+- **Trusted cleaner:** `cleaning/structured/hackernews.py` — pure DuckDB + boto3 (the tool-justification rule applies: ~169 rows per snapshot does not need a Spark JVM). Dedupes on `object_id`, derives `host` from `url` for the dashboard.
+- **Fact:** `fact_hn_stories` joins `dim_figure` on `figure_slug`. Live count: **169 stories, 8 figures, 105 distinct hosts, 18 years of HN history (2008→2026)**.
+- **Dashboard:** the HN panel in the Exploitation tab shows stories-per-figure, top hosts (New Yorker, Paris Review, Guardian, NYT, …), and top stories by points.
+
+### Streaming Seam (Hot Path)
+- **Producer:** `ingestion/stream_producer.py` — synthetic generator that emits `character-mentions` events to Kafka (`character_name`, `domain`, `message`, `sentiment_score`, `source`) on a randomized 1–5s cadence. Not backed by a real Reddit/Twitter API; it simulates social-media traffic for the streaming demo.
+- **Aggregator:** `ingestion/spark_stream_mentions_1m.py` — Spark Structured Streaming job, 1-minute tumbling windows keyed by `(character_name, domain)`, watermark 30s, writes parquet to `streaming/fact_mentions_1m/`.
+- **Exposure:** `exploitation/structured/fact_mentions_1m.py` registers a DuckDB VIEW in `exploit.duckdb` that reads the parquet on the fly and LEFT JOINs `dim_figure` on `name` to attach `figure_slug` (NULL on unmapped names = visible drift signal).
+- **Run locally:**
+  ```bash
+  # 1) start the producer in the airflow-scheduler container
+  docker compose exec -d airflow-scheduler python /opt/airflow/ingestion/stream_producer.py
+  # 2) start the Spark streaming job
+  docker compose exec -d airflow-scheduler spark-submit \
+      --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0 \
+      /opt/airflow/ingestion/spark_stream_mentions_1m.py
+  # 3) re-register the view so it sees the new files
+  docker compose exec airflow-scheduler python /opt/airflow/exploitation/structured/fact_mentions_1m.py
+  ```
+
+### Dashboard (BI seam)
+- **Code:** `streamlit_app/app.py` — single-page Streamlit app, port **8501**.
+- **Six tabs:** Landing (MinIO objects) · Trusted (DuckDB table row counts) · Exploitation (star-schema queries + custom SQL, including the HN discourse-signal panel: top hosts, stories-per-figure, top stories by points) · Streaming (live `fact_mentions_1m` window rows) · Milvus (`corpus_chunks` stats) · Episodes (rendered podcast Markdown).
+- **Source of truth:** reads `duckdb/trusted.duckdb` + `duckdb/exploit.duckdb` (read-only mounts) and `streaming/fact_mentions_1m/*.parquet` directly. Each tab degrades gracefully if its source isn't populated yet.
+- **Open:** `http://localhost:8501` once `docker compose up` is settled.
 
 ---
 
@@ -103,6 +133,7 @@ The challenge is that such an AI needs to answer a deceptively complex question:
 | **Community Q&A** | Modern philosophical debates, clarifications, and community Q&A | Philosophy Stack Exchange API |
 | **Conversational Dynamics** | How an interview or debate flows — tone, pacing, turn-taking | Podcast Audio (iTunes RSS) |
 | **Current Events Awareness** | Top trending daily news so the historical figure can "react" to the modern world | GNews API (Top Headlines) |
+| **Public Discourse Signal** | Where and how each figure is being discussed today (high-quality long-form posts) | Hacker News Algolia API (P2 addition) |
 
 This P1 deliverable focuses on **Phase 1**: Building and automating a fully containerized, self-healing Bronze Layer pipeline to **extract and store all this raw data at scale**, creating the foundation from which the future Trusted Zone (data cleansing) and Exploitation Zone (AI model training) can be built.
 
@@ -112,7 +143,7 @@ This P1 deliverable focuses on **Phase 1**: Building and automating a fully cont
 
 The pipeline follows a **Registry-Driven, Micro-Ingestion architecture** organized around a central `character_registry.py` — a single source of truth for all target entities. Every ingestion script reads from this registry, ensuring that adding a new historical figure to the pipeline only requires editing one file.
 
-The pipeline currently targets **9 historical figures** across three domains (philosophy, science, literature), ingesting data from **7 external sources** plus a Kafka-based streaming pipeline.
+The pipeline currently targets **9 historical figures** across three domains (philosophy, science, literature), ingesting data from **8 external sources** (P2 added Hacker News via the Algolia API) plus a Kafka-based streaming pipeline.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -558,6 +589,8 @@ P1/
 │   ├── wikiquote_ingest.py        # Wikiquote API → Quotes JSON → MinIO
 │   ├── philosophyse_ingest.py     # StackExchange → Q&A JSON → MinIO
 │   ├── news_ingest.py             # GNews API → Daily Headlines JSON → MinIO
+│   ├── hackernews_ingest.py       # P2 — HN Algolia API → Landing JSON → MinIO
+│   ├── spark_stream_mentions_1m.py # P2 — Spark Structured Streaming aggregator
 │   ├── stream_producer.py         # SIMULATED trends → Kafka
 │   ├── stream_consumer.py         # Kafka → MinIO (Hot Path)
 │   └── metadata_to_delta.py       # JSON → Delta Lake (Lakehouse conversion)
@@ -579,6 +612,8 @@ P1/
 │       ├── fact_quotes.py
 │       ├── fact_news_articles.py
 │       ├── fact_se_qa.py
+│       ├── fact_hn_stories.py     # P2 — HN discourse signal fact
+│       ├── fact_mentions_1m.py    # Streaming view over parquet → exploit.duckdb
 │       └── corpus_chunks.py       # Spark job → Milvus
 │
 ├── consumption/                   # P2 Consumption Zone — conversational podcast
@@ -589,6 +624,13 @@ P1/
 │   │   └── episode.py
 │   ├── llm.py                     # Provider-swappable Claude wrapper
 │   └── episodes/                  # Generated Markdown episodes (gitignored)
+│
+├── streamlit_app/                 # P2 BI seam — single-page lakehouse dashboard
+│   ├── app.py                     # 6 tabs: Landing/Trusted/Exploit/Stream/Milvus/Episodes
+│   └── requirements.txt
+│
+├── streaming/                     # Spark Structured Streaming output (gitignored)
+│   └── fact_mentions_1m/          # 1-min character-mention parquet windows
 │
 ├── duckdb/                        # P2 DuckDB files (gitignored — regenerable)
 │   ├── trusted.duckdb
