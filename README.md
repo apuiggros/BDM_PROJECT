@@ -1,16 +1,19 @@
 # 🏛️ Historical Conversational AI — Data Lakehouse Pipeline
 ### Big Data Management (BDM) — P1 (Landing Zone) + P2 (Trusted, Exploitation, Consumption)
 
-> **Project status — 2026-05-20**
-> P1 delivered (graded **9.5/10**). P2 design submitted; implementation of the Trusted, Exploitation, and Consumption zones is **largely done and running end-to-end on the batch side**. Streaming integration with the hot path is the remaining seam (coordinated with Santi). P2 deadline: **2026-06-09**.
+> **Project status — 2026-06-01 · P2 COMPLETE** &nbsp;·&nbsp; P1 graded **9.5/10** &nbsp;·&nbsp; P2 deadline 2026-06-09
 >
-> **Current architecture (post-P2 design):**
-> - **Landing** — MinIO (raw bytes, one prefix per source). **Unchanged from P1.**
-> - **Trusted** — DuckDB (`duckdb/trusted.duckdb`). 11 cleaned tables. One row per source record, typed, deduped. **Built by `bdm_p2_trusted_zone_dag`.**
-> - **Exploitation** — DuckDB star schema (`duckdb/exploit.duckdb`) + Milvus vector store (`corpus_chunks`). `dim_figure` + 4 fact tables + RAG corpus. **Built by `bdm_p2_exploitation_zone_dag`, auto-triggered from Trusted.**
-> - **Consumption** — Conversational podcast interview (Reasoner / Voice / Interviewer / Episode composer), Claude as provider-swappable LLM. Outputs Markdown episodes to `consumption/episodes/`.
+> **All four zones plus the BI seam are wired end-to-end and running.** The whole stack stands up with a single `make up` (see [§ Deploy the stack](#-deploy-the-stack)).
 >
-> **Note on the P1 Delta tables:** the `bronze_tables/` Delta Lake layer described below is **deprecated** as of P2. All tabular state now lives in DuckDB (trusted + exploitation), and all vector state lives in Milvus. MongoDB was dropped during P2 design — every tool is justified by a downstream consumer (see `documents/P2_TECHNICAL_REPORT.pdf` §7, §9).
+> - **Landing** — MinIO. **8 batch sources** (Philosophers, Wikipedia, Wikiquote, Gutenberg, GNews, Stack Exchange, Podcast audio, **Hacker News Algolia** — new in P2) plus a **Kafka streaming topic**.
+> - **Trusted** — DuckDB `trusted.duckdb`. 12 cleaned tables. PySpark for the heavy reads; pure DuckDB+boto3 for the small ones (tool-justified by data volume).
+> - **Exploitation** — DuckDB star schema `exploit.duckdb` (`dim_figure` + **5 fact tables + 1 streaming view**) plus a Milvus `corpus_chunks` collection (**87,437 vectors**, HNSW/COSINE, sentence-transformers/all-MiniLM-L6-v2).
+> - **Consumption** — **(a)** Conversational podcast interview (Reasoner / Voice / Interviewer / Episode composer, Claude `claude-sonnet-4-6`); **(b)** **Streamlit BI dashboard** at `:8501` with figure cards, custom SQL, and a Milvus semantic-search playground.
+> - **Streaming** — live Kafka → Spark Structured Streaming → Parquet → DuckDB view, joined to `dim_figure` and surfaced on the dashboard.
+>
+> **Full technical report:** [`documents/P2_TECHNICAL_REPORT.pdf`](documents/P2_TECHNICAL_REPORT.pdf) (12 pages, 12 sections).
+>
+> **Note on the P1 Delta tables:** the `bronze_tables/` Delta Lake layer described later in this README is **deprecated** as of P2. All tabular state lives in DuckDB (trusted + exploitation); all vector state lives in Milvus. MongoDB was deliberately dropped — every tool is justified by a downstream consumer (see the report §9 design-decision register, esp. D1 and D13).
 
 ---
 
