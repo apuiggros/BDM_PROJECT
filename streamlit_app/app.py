@@ -315,17 +315,22 @@ with tab_exploit:
 
             if "fact_se_qa" in counts["table"].values:
                 st.markdown("**Stack Exchange Q&A — top mentioned figures (`fact_se_qa`)**")
-                df = con.execute(
-                    """
-                    SELECT unnest(mentioned_figures) AS figure_slug,
-                           COUNT(*) AS qa_pairs
-                    FROM fact_se_qa
-                    WHERE mentioned_figures IS NOT NULL
-                    GROUP BY figure_slug
-                    ORDER BY qa_pairs DESC
-                    """
-                ).fetch_df()
-                st.dataframe(df, use_container_width=True)
+                try:
+                    df = con.execute(
+                        """
+                        SELECT figure_slug, COUNT(*) AS qa_pairs
+                        FROM (
+                            SELECT UNNEST(mentioned_figures) AS figure_slug
+                            FROM fact_se_qa
+                            WHERE mentioned_figures IS NOT NULL
+                        )
+                        GROUP BY figure_slug
+                        ORDER BY qa_pairs DESC
+                        """
+                    ).fetch_df()
+                    st.dataframe(df, use_container_width=True)
+                except Exception as e:
+                    st.caption(f"SE panel skipped ({e}).")
 
             if "fact_mentions_1m" in counts["table"].values:
                 st.markdown("**Live streaming mentions (`fact_mentions_1m` view)**")
