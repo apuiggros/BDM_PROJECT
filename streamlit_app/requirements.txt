@@ -5,3 +5,9 @@ python-dotenv
 pyarrow>=15.0
 duckdb>=1.0
 pymilvus>=2.4,<2.5
+# Semantic-search playground in the Milvus tab uses the same embedder as
+# the Reasoner agent — pinned to CPU to avoid pulling CUDA wheels into the
+# Streamlit container (which is ephemeral and small).
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch>=2.0,<3.0
+sentence-transformers>=3.0

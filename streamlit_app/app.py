@@ -210,12 +210,67 @@ with tab_exploit:
             st.markdown("### Quick star-schema queries")
 
             if "dim_figure" in counts["table"].values:
-                st.markdown("**Figures (`dim_figure`)**")
+                st.markdown("### Figure cards (`dim_figure`)")
+                st.caption(
+                    "Every column we ingested for each of the 9 figures — "
+                    "portrait, era, school/interests, Wikipedia/SEP/IEP links."
+                )
                 figs = con.execute(
-                    "SELECT figure_slug, name, domain, born, died "
-                    "FROM dim_figure ORDER BY name"
+                    """
+                    SELECT figure_slug, name, domain, school, born, died,
+                           interests, wikipedia_description, wikipedia_summary,
+                           wikipedia_link, sep_link, iep_link, thumbnail_url
+                    FROM dim_figure ORDER BY domain, name
+                    """
                 ).fetch_df()
-                st.dataframe(figs, use_container_width=True, height=200)
+
+                def _era(born, died):
+                    def fmt(y):
+                        if y is None or pd.isna(y):
+                            return "?"
+                        y = int(y)
+                        return f"{-y} BC" if y < 0 else str(y)
+                    span = (
+                        int(died) - int(born)
+                        if pd.notna(born) and pd.notna(died) else None
+                    )
+                    line = f"{fmt(born)} – {fmt(died)}"
+                    if span is not None:
+                        line += f"  ({span} yrs)"
+                    return line
+
+                # 3 columns × 3 rows
+                cols = st.columns(3)
+                for i, row in figs.iterrows():
+                    with cols[i % 3]:
+                        with st.container(border=True):
+                            inner = st.columns([1, 2])
+                            with inner[0]:
+                                if row["thumbnail_url"]:
+                                    st.image(row["thumbnail_url"], width=110)
+                            with inner[1]:
+                                st.markdown(f"**{row['name']}**")
+                                st.caption(
+                                    f"_{row['wikipedia_description'] or row['domain']}_"
+                                )
+                                st.caption(_era(row["born"], row["died"]))
+                                if row["school"]:
+                                    st.caption(f"School: {row['school']}")
+                            summ = row["wikipedia_summary"] or ""
+                            if summ:
+                                st.markdown(
+                                    summ[:280] + ("…" if len(summ) > 280 else "")
+                                )
+                            link_bits = []
+                            if row["wikipedia_link"]:
+                                link_bits.append(f"[Wikipedia]({row['wikipedia_link']})")
+                            if row["sep_link"]:
+                                link_bits.append(f"[SEP]({row['sep_link']})")
+                            if row["iep_link"]:
+                                link_bits.append(f"[IEP]({row['iep_link']})")
+                            if link_bits:
+                                st.caption(" · ".join(link_bits))
+                st.markdown("---")
 
             cols = st.columns(2)
 
@@ -389,6 +444,90 @@ with tab_milvus:
             c2.metric("Embedding dim", 384)
             st.caption("Index: HNSW (M=16, efConstruction=200), metric=COSINE.")
             st.caption("Embedder: sentence-transformers/all-MiniLM-L6-v2.")
+
+            st.markdown("---")
+            st.markdown("### Semantic-search playground")
+            st.caption(
+                "The same retrieval the Reasoner agent uses. Pick a figure, "
+                "type a query, get the top passages from their books / "
+                "Wikipedia / Wikiquote / SE — ranked by cosine similarity."
+            )
+
+            # Pull the figure list from exploit.duckdb for the dropdown.
+            figure_choices: list[str] = []
+            if EXPLOIT_DB.exists():
+                fcon = open_duckdb(EXPLOIT_DB)
+                if fcon is not None:
+                    try:
+                        figure_choices = [
+                            r[0] for r in fcon.execute(
+                                "SELECT figure_slug FROM dim_figure ORDER BY name"
+                            ).fetchall()
+                        ]
+                    finally:
+                        fcon.close()
+
+            sc1, sc2, sc3 = st.columns([1, 3, 1])
+            with sc1:
+                fig_pick = st.selectbox(
+                    "Figure", figure_choices or ["(no figures yet)"],
+                    key="milvus_search_figure",
+                )
+            with sc2:
+                query = st.text_input(
+                    "Query",
+                    value="What can we know about reality?",
+                    key="milvus_search_query",
+                )
+            with sc3:
+                top_k = st.number_input(
+                    "Top K", min_value=1, max_value=20, value=5,
+                    key="milvus_search_topk",
+                )
+
+            if st.button("Search", key="milvus_search_btn") and figure_choices:
+                try:
+                    from sentence_transformers import SentenceTransformer
+                    embedder = SentenceTransformer(
+                        "sentence-transformers/all-MiniLM-L6-v2"
+                    )
+                    vec = embedder.encode(
+                        [query], normalize_embeddings=True
+                    )[0].tolist()
+                    expr = f'figure_slug == "{fig_pick}"'
+                    res = col.search(
+                        [vec], "embedding",
+                        {"metric_type": "COSINE", "params": {"ef": 64}},
+                        limit=int(top_k), expr=expr,
+                        output_fields=["chunk_text", "source", "source_id", "subtype"],
+                    )
+                    hits = res[0]
+                    if not hits:
+                        st.info(
+                            f"No chunks for `{fig_pick}` matched. "
+                            "Try a different figure or query."
+                        )
+                    for i, hit in enumerate(hits):
+                        e = hit.entity
+                        src = e.get("source") or ""
+                        sid = str(e.get("source_id") or "")
+                        sub = e.get("subtype") or ""
+                        score = float(hit.distance)
+                        with st.container(border=True):
+                            st.caption(
+                                f"**[{i+1}]** `{src}:{sid}"
+                                f"{'/' + sub if sub else ''}` · "
+                                f"cosine = {score:.3f}"
+                            )
+                            st.write(e.get("chunk_text"))
+                except ImportError:
+                    st.error(
+                        "sentence-transformers not installed in the Streamlit "
+                        "env. Add it to streamlit_app/requirements.txt."
+                    )
+                except Exception as e:
+                    st.error("Search failed.")
+                    st.exception(e)
         connections.disconnect("dash")
     except ImportError:
         st.info("pymilvus not installed in this env — skipping Milvus panel.")

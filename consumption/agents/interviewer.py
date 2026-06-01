@@ -19,8 +19,14 @@ ambient inspiration — a signal of "what's in the air" — never a script:
 
 The figure ANSWERS via Reasoner+Voice; the Interviewer only frames + asks.
 
-`fact_news_articles` (DuckDB) remains the news layer's consumer — it just
-feeds the curator as inspiration rather than as content.
+Two ambient signals feed the curator:
+  • `fact_news_articles` — broad daily news (world/tech/science).
+  • `fact_hn_stories`    — Hacker News stories matching the figure's name
+    (quoted-phrase search at ingestion). HN is added because GNews on its
+    own is mostly geopolitics; HN's audience produces the kind of thoughtful
+    long-form discourse the curator actually wants ("Immanuel Kant — What
+    can we know?", "Darwin's notebooks lost and assumed stolen", etc.).
+Both are inspiration, never script.
 
 CLI:
     python -m consumption.agents.interviewer --figure kant            # offline
@@ -44,7 +50,8 @@ ROOT       = Path(__file__).resolve().parents[2]
 DUCKDB_DIR = Path(os.getenv("DUCKDB_DIR", ROOT / "duckdb"))
 EXPLOIT_DB = DUCKDB_DIR / "exploit.duckdb"
 
-HEADLINE_POOL = 15   # ambient headlines shown to the curator
+HEADLINE_POOL = 15   # ambient news headlines shown to the curator
+HN_POOL       = 10   # ambient HN stories per figure shown to the curator
 
 # Offline fallback themes — chosen to be evergreen and figure-appropriate so
 # even with no LLM the episode is interesting AND safe (no geopolitical match).
@@ -85,11 +92,55 @@ def recent_news(limit: int = HEADLINE_POOL) -> list[dict]:
     return [{"title": r[0], "url": r[1], "category": r[2]} for r in rows]
 
 
-def _curate_with_llm(card, headlines: list[dict],
+def recent_hn_for_figure(figure_slug: str, limit: int = HN_POOL) -> list[dict]:
+    """
+    Top HN stories that mention this specific figure, ranked by points. Each
+    row already carries figure_slug because the ingester searched per figure;
+    no join needed. The dashboard panel uses the same fact.
+
+    Returns [] if the fact table doesn't exist yet — the curator should still
+    work even before the HN source has been run.
+    """
+    if not EXPLOIT_DB.exists():
+        return []
+    con = duckdb.connect(str(EXPLOIT_DB), read_only=True)
+    try:
+        has_fact = con.execute(
+            "SELECT COUNT(*) FROM information_schema.tables "
+            "WHERE table_name = 'fact_hn_stories'"
+        ).fetchone()[0]
+        if not has_fact:
+            return []
+        rows = con.execute(
+            f"""
+            SELECT title, url, host, points, num_comments
+            FROM fact_hn_stories
+            WHERE figure_slug = ?
+            ORDER BY points DESC NULLS LAST
+            LIMIT {int(limit)}
+            """,
+            [figure_slug],
+        ).fetchall()
+    finally:
+        con.close()
+    return [
+        {
+            "title": r[0], "url": r[1], "host": r[2],
+            "points": r[3], "num_comments": r[4],
+        }
+        for r in rows
+    ]
+
+
+def _curate_with_llm(card, headlines: list[dict], hn_stories: list[dict],
                      llm_fn: Callable[[str], str], n: int) -> Optional[dict]:
-    listing = "\n".join(
+    news_listing = "\n".join(
         f"- [{h['category']}] {h['title']}" for h in headlines
-    )
+    ) or "(none)"
+    hn_listing = "\n".join(
+        f"- [{h['host'] or 'self'}] {h['title']} ({h['points']} pts)"
+        for h in hn_stories
+    ) or "(none)"
     prompt = (
         f"You produce a thoughtful interview podcast. Today's guest is "
         f"{card.name} ({card.description or card.domain}).\n\n"
@@ -97,12 +148,15 @@ def _curate_with_llm(card, headlines: list[dict],
         f"genuinely illuminate — e.g. the meaning of artificial "
         f"intelligence, the nature of scientific truth, human social "
         f"behaviour, art and technology, freedom, knowledge, ethics of "
-        f"modern life. You MAY draw a cue from a headline below ONLY if it "
-        f"maps naturally onto {card.name}'s real concerns; otherwise ignore "
-        f"the news entirely. Avoid raw geopolitics and any angle that would "
-        f"mainly provoke prejudice rather than insight.\n\n"
-        f"Ambient headlines (inspiration only, do NOT summarise them):\n"
-        f"{listing}\n\n"
+        f"modern life. You MAY draw a cue from one of the items below ONLY "
+        f"if it maps naturally onto {card.name}'s real concerns; otherwise "
+        f"ignore them entirely. Avoid raw geopolitics and any angle that "
+        f"would mainly provoke prejudice rather than insight.\n\n"
+        f"Ambient daily news (broad, GNews — inspiration only):\n"
+        f"{news_listing}\n\n"
+        f"Hacker News stories mentioning {card.name} (curated long-form "
+        f"discourse — inspiration only):\n"
+        f"{hn_listing}\n\n"
         f"Respond with ONLY a JSON object:\n"
         f'{{"theme": "<one engaging sentence>", '
         f'"news_inspired": true|false, '
@@ -190,7 +244,9 @@ def pick_topic(figure_slug: str,
             headlines = recent_news()
         except FileNotFoundError:
             headlines = []
-        data = _curate_with_llm(card, headlines, llm_fn, n_questions)
+        hn_stories = recent_hn_for_figure(figure_slug)
+        data = _curate_with_llm(card, headlines, hn_stories,
+                                 llm_fn, n_questions)
     if data is None:
         data = _template(card, n_questions)
 
@@ -203,6 +259,11 @@ def pick_topic(figure_slug: str,
                     break
         except FileNotFoundError:
             pass
+        if news_url is None:
+            for h in recent_hn_for_figure(figure_slug, limit=40):
+                if h["title"] == data["news_title"]:
+                    news_url = h["url"]
+                    break
 
     cue = (f" (prompted by today's news: \"{data['news_title']}\")"
            if data["news_inspired"] and data["news_title"] else "")
