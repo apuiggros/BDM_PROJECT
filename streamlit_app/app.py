@@ -59,163 +59,219 @@ EPISODES_DIR = Path(os.getenv(
 MILVUS_HOST = os.getenv("MILVUS_HOST", "milvus")
 MILVUS_PORT = int(os.getenv("MILVUS_PORT", "19530"))
 
-# ─── CSS injection (Dabang restyle — see design_reference/HANDOFF.md §03) ─────
+# ─── CSS injection (Dabang restyle — FIXES.md legibility + fidelity pass) ────
 CSS = """
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
 
-:root{
-  --bg:#F4F5FB; --surface:#fff; --border:#ECEDF6; --hairline:#F2F3F9;
-  --ink:#25253C; --ink2:#5A5A75; --ink3:#9A9AB4;
-  --primary:#6B5BF2; --primary2:#8C7CF8; --soft:#EFEBFF;
-  --mint:#E2F7EE; --mint-ink:#2DB489;
-  --peach:#FFF0DF; --peach-ink:#F09A47;
-  --pink:#FFE4E8; --pink-ink:#F2607A;
-  --sky:#E5F0FE; --sky-ink:#4D93F0;
-  --mono:'JetBrains Mono', monospace;
+/* === Pin Streamlit's theme vars so OS/browser dark mode can't flip them === */
+:root, .stApp, [data-testid="stAppViewContainer"]{
+  --text-color:#25253C;
+  --background-color:#F4F5FB;
+  --secondary-background-color:#FFFFFF;
+  --primary-color:#6B5BF2;
+  color-scheme: light only;
+}
+@media (prefers-color-scheme: dark){
+  :root, .stApp, [data-testid="stAppViewContainer"]{
+    --text-color:#25253C; --background-color:#F4F5FB; --secondary-background-color:#FFFFFF;
+  }
 }
 
 /* ---- canvas + base type ---- */
+:root{
+  --bg:#F4F5FB; --surface:#fff; --border:#ECEDF6; --hair:#F2F3F9;
+  --ink:#25253C; --ink2:#5A5A75; --ink3:#8A8AA3;
+  --primary:#6B5BF2; --primary2:#8C7CF8; --soft:#EFEBFF;
+}
 .stApp{ background:var(--bg); }
-html, body, [class*="css"]{ font-family:'Inter',sans-serif; color:var(--ink2); }
-h1,h2,h3,h4{ font-family:'Poppins',sans-serif; color:var(--ink);
-  letter-spacing:-.01em; font-weight:700; }
+html, body, [class*="css"]{ font-family:'Inter',sans-serif; }
 .block-container{ padding-top:2rem; max-width:1380px; }
 
+/* === Streamlit's own text defaults (white-on-white culprits) === */
+.stApp h1, .stApp h2, .stApp h3, .stApp h4, .stApp h5, .stApp h6,
+[data-testid="stHeading"], [data-testid="stMarkdownContainer"] h1,
+[data-testid="stMarkdownContainer"] h2, [data-testid="stMarkdownContainer"] h3{
+  font-family:'Poppins',sans-serif !important; color:var(--ink) !important;
+  letter-spacing:-.01em; font-weight:700;
+}
+.stMarkdown, .stText, .element-container,
+.stMarkdown p, .stMarkdown li, .stMarkdown span:not([class]),
+[data-testid="stMarkdownContainer"] p, [data-testid="stMarkdownContainer"] li{
+  color:var(--ink2) !important;
+}
+.stCaption, [data-testid="stCaptionContainer"],
+[data-testid="stCaptionContainer"] p{ color:var(--ink3) !important; }
+.stMarkdown a, [data-testid="stMarkdownContainer"] a{ color:var(--primary) !important; }
+
 /* ---- sidebar ---- */
-section[data-testid="stSidebar"]{ background:var(--surface); border-right:1px solid var(--border); }
+section[data-testid="stSidebar"]{
+  background:var(--surface) !important; border-right:1px solid var(--border);
+}
+section[data-testid="stSidebar"] *{ color:var(--ink2); }
+section[data-testid="stSidebar"] h1, section[data-testid="stSidebar"] h2,
+section[data-testid="stSidebar"] h3{ color:var(--ink) !important; }
+
+/* === Connection block: dark navy monospaced panel === */
 section[data-testid="stSidebar"] .stCode{
-  background:#20203A !important; border-radius:14px;
-  font-family:var(--mono) !important; padding:14px 16px;
+  background:#20203A !important; border:1px solid #2C2C49 !important;
+  border-radius:14px !important;
 }
 section[data-testid="stSidebar"] .stCode pre,
 section[data-testid="stSidebar"] .stCode code{
-  background:transparent !important; color:#cfd0f0 !important;
-  font-family:var(--mono) !important; font-size:11.5px !important;
+  background:transparent !important; color:#CFD0F0 !important;
+  font-family:'JetBrains Mono', monospace !important; font-size:11.5px !important;
 }
 
-/* ---- tabs → underline nav ---- */
-.stTabs [data-baseweb="tab-list"]{ gap:28px; border-bottom:1.5px solid var(--border); background:transparent; }
-.stTabs [data-baseweb="tab"]{ height:auto; padding:0 2px 14px; background:transparent;
-  font-family:'Poppins'; font-weight:600; font-size:14px; color:var(--ink3); }
-.stTabs [aria-selected="true"]{ color:var(--ink); }
-.stTabs [data-baseweb="tab-highlight"]{ height:3px; border-radius:3px 3px 0 0;
-  background:linear-gradient(135deg,var(--primary),var(--primary2)); }
-.stTabs [data-baseweb="tab-border"]{ display:none; }
+/* ---- tabs → underline nav (NOT pills) ---- */
+.stTabs [data-baseweb="tab-list"]{
+  gap:28px; background:transparent !important;
+  border-bottom:1.5px solid var(--border);
+}
+.stTabs [data-baseweb="tab"]{
+  height:auto; padding:0 2px 14px; background:transparent !important;
+  font-family:'Poppins'; font-weight:600; font-size:14px; color:var(--ink3) !important;
+}
+.stTabs [aria-selected="true"]{ color:var(--ink) !important; }
+.stTabs [data-baseweb="tab-highlight"]{
+  height:3px; border-radius:3px 3px 0 0; background-color:transparent !important;
+  background-image:linear-gradient(135deg,var(--primary),var(--primary2)) !important;
+}
+.stTabs [data-baseweb="tab-border"]{ display:none !important; }
 
-/* ---- bordered containers → soft cards ---- */
-[data-testid="stVerticalBlockBorderWrapper"]{ background:var(--surface);
-  border:1px solid var(--border); border-radius:20px;
-  box-shadow:0 4px 14px rgba(36,37,80,.04); }
+/* === Bordered containers → soft cards with the subtle shadow back === */
+[data-testid="stVerticalBlockBorderWrapper"]{
+  background:var(--surface) !important; border:1px solid var(--border) !important;
+  border-radius:20px !important; box-shadow:0 4px 14px rgba(36,37,80,.04) !important;
+}
 [data-testid="stVerticalBlockBorderWrapper"] > div{ padding:6px; }
 
-/* ---- metric tiles ---- */
-.metric-tile{ border-radius:16px; padding:20px; }
-.metric-tile .chip{ width:42px; height:42px; border-radius:13px; display:grid; place-items:center;
-  margin-bottom:16px; color:#fff; }
-.metric-tile .num{ font-family:'Poppins'; font-weight:700; font-size:26px; color:var(--ink); line-height:1; }
-.metric-tile .lab{ font-size:12.5px; color:var(--ink2); font-weight:500; margin-top:7px; }
-.metric-tile .delta{ font-size:11px; font-weight:600; color:#2DB489; margin-top:7px;
-  font-family:var(--mono); }
-.metric-tile.lilac{ background:var(--soft); } .metric-tile.lilac .chip{ background:var(--primary2); }
-.metric-tile.mint{ background:var(--mint); }  .metric-tile.mint  .chip{ background:var(--mint-ink); }
-.metric-tile.peach{ background:var(--peach); }.metric-tile.peach .chip{ background:var(--peach-ink); }
-.metric-tile.pink{ background:var(--pink); }  .metric-tile.pink  .chip{ background:var(--pink-ink); }
+/* ---- fallback st.metric (if any left) ---- */
+[data-testid="stMetric"]{ background:var(--soft); border-radius:16px; padding:18px; }
+[data-testid="stMetricValue"]{ font-family:'Poppins'; font-weight:700; color:var(--ink) !important; }
+[data-testid="stMetricLabel"]{ color:var(--ink2) !important; }
+[data-testid="stMetricDelta"]{ color:#2DB489 !important; }
 
-/* ---- figure cards ---- */
-.figure-card{ background:var(--surface); border:1px solid var(--border); border-radius:16px;
-  padding:18px; display:flex; flex-direction:column; gap:13px; transition:.18s; }
-.figure-card:hover{ box-shadow:0 10px 30px rgba(36,37,80,.06); transform:translateY(-2px);
-  border-color:#E3E1FB; }
+/* ==========================================================================
+   CUSTOM HTML helpers — explicit color on EVERY rendered element.
+   (st.markdown(html, unsafe_allow_html=True) does NOT inherit Streamlit text
+    color, and Streamlit's .stMarkdown p rule can win — so set + !important.)
+   ========================================================================== */
+
+/* metric tiles ---------------------------------------------------------- */
+.metric-tile{ border-radius:16px; padding:20px; border:1px solid transparent; }
+.metric-tile.lilac{ background:#EFEBFF; } .metric-tile.mint{ background:#E2F7EE; }
+.metric-tile.peach{ background:#FFF0DF; } .metric-tile.pink{ background:#FFE4E8; }
+.metric-tile .chip{
+  width:42px; height:42px; border-radius:13px; display:grid; place-items:center;
+  margin-bottom:16px; color:#fff !important;
+}
+.metric-tile.lilac .chip{ background:#8C7CF8; } .metric-tile.mint .chip{ background:#2DB489; }
+.metric-tile.peach .chip{ background:#F09A47; } .metric-tile.pink .chip{ background:#F2607A; }
+.metric-tile .chip svg{ stroke:#fff !important; }
+.metric-tile .num{ font-family:'Poppins'; font-weight:700; font-size:26px; line-height:1; color:#25253C !important; }
+.metric-tile .lab{ font-size:12.5px; font-weight:500; margin-top:7px; color:#5A5A75 !important; }
+.metric-tile .delta{ font-size:11px; font-weight:600; margin-top:7px; color:#2DB489 !important; }
+
+/* figure cards ---------------------------------------------------------- */
+.figure-card{
+  background:#fff; border:1px solid #ECEDF6; border-radius:16px; padding:18px;
+  box-shadow:0 4px 14px rgba(36,37,80,.04);
+  transition:box-shadow .18s, transform .18s, border-color .18s;
+}
+.figure-card:hover{ box-shadow:0 10px 30px rgba(36,37,80,.06); transform:translateY(-2px); border-color:#E3E1FB; }
 .figure-card .fig-top{ display:flex; gap:14px; align-items:center; }
-.figure-card .portrait{ width:60px; height:60px; border-radius:16px; display:grid; place-items:center;
-  font-family:'Poppins'; font-weight:700; font-size:22px; color:#fff;
-  background-image: linear-gradient(135deg, rgba(255,255,255,.18) 25%, transparent 25%, transparent 50%, rgba(255,255,255,.18) 50%, rgba(255,255,255,.18) 75%, transparent 75%);
-  background-size: 8px 8px; }
-.figure-card .portrait img{ width:100%; height:100%; border-radius:16px; object-fit:cover; }
 .figure-card .fig-meta{ display:flex; flex-direction:column; gap:4px; }
-.figure-card .fig-name{ font-family:'Poppins'; font-weight:700; font-size:16px; color:var(--ink); }
-.figure-card .fig-dates{ font-family:var(--mono); font-size:11px; color:var(--ink3); }
 .figure-card .fig-tags{ display:flex; gap:6px; margin-top:4px; flex-wrap:nowrap; }
-.figure-card .chiplet{ font-size:10.5px; font-weight:600; padding:3px 9px; border-radius:8px;
-  background:var(--soft); color:var(--primary2); white-space:nowrap; }
-.figure-card .chiplet.neutral{ background:var(--hairline); color:var(--ink2); }
-.figure-card .fig-bio{ font-family:'Inter'; font-size:12.5px; line-height:1.55; color:var(--ink2); }
-.figure-card .fig-links{ display:flex; gap:16px; padding-top:10px; border-top:1px solid var(--hairline);
-  flex-wrap:wrap; }
-.figure-card .fig-links a{ font-family:'Poppins'; font-weight:600; font-size:10px;
-  letter-spacing:.08em; text-transform:uppercase; color:var(--primary); text-decoration:none; }
-.figure-card .fig-links a::before{ content:"●"; margin-right:5px; font-size:7px; vertical-align:middle; }
+.figure-card .portrait{
+  width:60px; height:60px; border-radius:16px; display:grid; place-items:center;
+  font-family:'Poppins'; font-weight:700; font-size:22px; color:#fff !important; flex:none;
+}
+.figure-card .portrait img{ width:100%; height:100%; border-radius:16px; object-fit:cover; }
+.figure-card .fig-name{ font-family:'Poppins'; font-weight:700; font-size:16px; color:#25253C !important; }
+.figure-card .fig-dates{ font-family:'JetBrains Mono'; font-size:11px; color:#8A8AA3 !important; margin-top:2px; }
+.figure-card .chiplet{ font-size:10.5px; font-weight:600; padding:3px 9px; border-radius:8px; background:#F4F5FB; color:#5A5A75 !important; }
+.figure-card .chiplet.role-phil{ background:#EFEBFF; color:#7A6BF0 !important; }
+.figure-card .chiplet.role-sci{  background:#E5F0FE; color:#3F82DC !important; }
+.figure-card .chiplet.role-auth{ background:#FFF0DF; color:#D98326 !important; }
+.figure-card .fig-bio{ font-size:12.5px; line-height:1.55; color:#5A5A75 !important; }
+.figure-card .fig-links{ display:flex; gap:16px; border-top:1px solid #F2F3F9; padding-top:11px; flex-wrap:wrap; }
+.figure-card .fig-links a{
+  font-family:'Poppins'; font-weight:600; font-size:10px; letter-spacing:.08em;
+  text-transform:uppercase; color:#6B5BF2 !important; text-decoration:none;
+}
 
-/* role tints (portrait bg + matching chiplet) */
-.role-philosopher .portrait{ background-color:var(--primary2); }
-.role-philosopher .chiplet.role{ background:var(--soft); color:var(--primary2); }
-.role-scientist  .portrait{ background-color:var(--sky-ink); }
-.role-scientist  .chiplet.role{ background:var(--sky); color:var(--sky-ink); }
-.role-author     .portrait{ background-color:var(--peach-ink); }
-.role-author     .chiplet.role{ background:var(--peach); color:var(--peach-ink); }
+/* role-tinted portraits */
+.figure-card.role-phil .portrait{ background:#8C7CF8; }
+.figure-card.role-sci  .portrait{ background:#4D93F0; }
+.figure-card.role-auth .portrait{ background:#F09A47; }
 
-/* ---- HN row + points pill ---- */
-.hn-row{ display:flex; align-items:center; gap:14px; padding:10px 0; border-bottom:1px solid var(--hairline); }
+/* Hacker News rows ------------------------------------------------------ */
+.hn-row{ display:flex; align-items:center; gap:14px; padding:10px 0; border-bottom:1px solid #F2F3F9; }
 .hn-row:last-child{ border-bottom:0; }
-.hn-rank{ font-family:var(--mono); font-size:12px; color:var(--ink3); width:24px; }
-.hn-body{ flex:1; min-width:0; }
-.hn-title{ font-size:13.5px; font-weight:600; color:var(--ink); line-height:1.4;
+.hn-row .hn-rank{ font-family:'JetBrains Mono'; font-size:12px; color:#8A8AA3 !important; width:24px; }
+.hn-row .hn-body{ flex:1; min-width:0; }
+.hn-row .hn-title{ font-size:13.5px; font-weight:600; color:#25253C !important; line-height:1.4;
   display:block; text-overflow:ellipsis; overflow:hidden; white-space:nowrap; }
-.hn-sub{ font-family:var(--mono); font-size:11px; color:var(--ink3); margin-top:2px; }
-.hn-points{ font-family:'Poppins'; font-weight:700; font-size:12.5px;
-  background:var(--peach); color:var(--peach-ink); padding:4px 10px; border-radius:9px; }
-.host-bar{ background:var(--hairline); border-radius:99px; height:6px; overflow:hidden; margin-top:4px; }
-.host-bar > span{ display:block; height:100%;
-  background:linear-gradient(135deg,var(--primary),var(--primary2)); border-radius:99px; }
+.hn-row .hn-sub{ font-family:'JetBrains Mono'; font-size:11px; color:#8A8AA3 !important; margin-top:2px; }
+.hn-row .hn-points{
+  font-family:'Poppins'; font-weight:700; font-size:12.5px;
+  background:#FFF0DF; color:#F09A47 !important; padding:5px 11px; border-radius:9px; white-space:nowrap;
+}
+.host-row{ padding:8px 0; border-bottom:1px solid #F2F3F9; }
+.host-row .host-head{ display:flex; justify-content:space-between; align-items:baseline; }
+.host-row .host-name{ font-family:'JetBrains Mono'; font-size:12px; color:#5A5A75 !important; }
+.host-row .host-val{ font-family:'Poppins'; font-weight:600; font-size:12px; color:#25253C !important; }
+.host-bar{ height:6px; border-radius:4px; background:#F2F3F9; overflow:hidden; margin-top:4px; }
+.host-bar i{ display:block; height:100%; background:linear-gradient(135deg,#6B5BF2,#8C7CF8); }
 
-/* ---- LIVE badge ---- */
+/* LIVE badge ------------------------------------------------------------ */
 .live-badge{ display:inline-flex; align-items:center; gap:7px; font-family:'Poppins'; font-weight:700;
-  font-size:11px; color:var(--mint-ink); background:var(--mint); padding:4px 10px; border-radius:99px;
+  font-size:11px; color:#2DB489 !important; background:#E2F7EE; padding:4px 11px; border-radius:999px;
   letter-spacing:.06em; }
-.live-badge::before{ content:""; width:7px; height:7px; border-radius:50%; background:var(--mint-ink);
-  box-shadow:0 0 0 0 rgba(45,180,137,.55); animation:pulse 1.4s infinite; }
+.live-badge .pulse{ width:7px; height:7px; border-radius:50%; background:#2DB489;
+  animation:pulse 1.4s infinite; }
 @keyframes pulse{
-  0%{ box-shadow:0 0 0 0 rgba(45,180,137,.55); }
-  70%{ box-shadow:0 0 0 8px rgba(45,180,137,0); }
+  0%{ box-shadow:0 0 0 0 rgba(45,180,137,.5); }
+  70%{ box-shadow:0 0 0 6px rgba(45,180,137,0); }
   100%{ box-shadow:0 0 0 0 rgba(45,180,137,0); }
 }
 
-/* ---- buttons ---- */
-.stButton > button{ border-radius:12px; font-family:'Poppins'; font-weight:600;
-  border:1px solid var(--border); color:var(--ink); }
-.stButton > button[kind="primary"]{ border:none; color:#fff;
+/* ---- buttons + inputs ---- */
+.stButton > button{ border-radius:12px; font-family:'Poppins'; font-weight:600; border:1px solid var(--border); color:var(--ink2); }
+.stButton > button[kind="primary"]{
+  border:none; color:#fff !important;
   background:linear-gradient(135deg,var(--primary),var(--primary2));
-  box-shadow:0 8px 18px rgba(107,91,242,.28); }
-
-/* ---- inputs ---- */
-.stTextArea textarea, .stTextInput input, .stSelectbox > div > div{
-  border-radius:12px; border:1px solid var(--border); font-family:var(--mono); }
-
-/* dark SQL editor — applied when the textarea sits inside .sql-box */
-.sql-box .stTextArea textarea{
-  background:#1E1E33 !important; color:#D7D7F2 !important; border-color:#2C2C49 !important;
-  font-family:var(--mono) !important; font-size:13px; line-height:1.6;
+  box-shadow:0 8px 18px rgba(107,91,242,.28);
 }
+.stTextArea textarea{
+  background:#1E1E33 !important; color:#D7D7F2 !important; border:1px solid #2C2C49 !important;
+  border-radius:12px !important; font-family:'JetBrains Mono' !important; font-size:12.5px !important;
+}
+.stTextInput input{ border-radius:12px !important; border:1px solid var(--border) !important;
+  font-family:'JetBrains Mono' !important; color:var(--ink) !important; }
+.stSelectbox > div > div{ border-radius:12px !important; border:1px solid var(--border) !important; color:var(--ink) !important; }
 
-/* ---- dataframe ---- */
+/* ---- dataframe + charts ---- */
 .stDataFrame{ border:1px solid var(--border); border-radius:14px; overflow:hidden; }
-.stDataFrame thead th{ background:#FAFAFE; font-family:'Poppins';
-  text-transform:uppercase; font-size:11px; letter-spacing:.05em; color:var(--ink3); }
-
-/* ---- charts ---- */
-.stVegaLiteChart .role-axis line, .stVegaLiteChart .role-axis path{ stroke:#E6E7F1; }
+.stDataFrame thead th{
+  background:#FAFAFE !important; font-family:'Poppins' !important; text-transform:uppercase;
+  font-size:11px !important; letter-spacing:.05em; color:var(--ink3) !important;
+}
+.stDataFrame tbody td{ color:var(--ink2) !important; }
+.stVegaLiteChart .role-axis line, .stVegaLiteChart .role-axis path{ stroke:#E6E7F1 !important; }
+.stVegaLiteChart .role-axis text{ fill:#8A8AA3 !important; }
 
 /* ---- small UX helpers ---- */
-.page-title{ font-family:'Poppins'; font-weight:700; font-size:24px; color:var(--ink); margin:0; }
-.page-sub{ font-size:13px; color:var(--ink2); margin-top:2px; }
-.hint{ font-family:var(--mono); font-size:11.5px; color:var(--ink3); }
+.page-title{ font-family:'Poppins'; font-weight:700; font-size:24px; color:var(--ink) !important; margin:0; }
+.page-sub{ font-size:13px; color:var(--ink2) !important; margin-top:2px; }
+.hint{ font-family:'JetBrains Mono'; font-size:11.5px; color:var(--ink3) !important; }
 .sidebar-brand{ display:flex; gap:10px; align-items:center; padding:6px 4px 18px; }
 .sidebar-brand .mark{ width:34px; height:34px; border-radius:11px;
   background:linear-gradient(135deg,var(--primary),var(--primary2)); display:grid; place-items:center;
-  color:#fff; font-weight:700; }
-.sidebar-brand .name{ font-family:'Poppins'; font-weight:700; color:var(--ink); font-size:14px; }
-.sidebar-brand .name small{ display:block; font-weight:500; font-size:11px; color:var(--ink3); }
+  color:#fff !important; font-weight:700; }
+.sidebar-brand .name{ font-family:'Poppins'; font-weight:700; color:var(--ink) !important; font-size:14px; }
+.sidebar-brand .name small{ display:block; font-weight:500; font-size:11px; color:var(--ink3) !important; }
 </style>
 """
 st.markdown(CSS, unsafe_allow_html=True)
@@ -279,11 +335,11 @@ def figure_card(row: dict) -> None:
     iep_link, thumbnail_url. Missing keys are tolerated."""
     domain = (row.get("domain") or "").lower()
     if "philosoph" in domain or domain == "philosophy":
-        role_class, role_label = "role-philosopher", "Philosopher"
+        role_class, role_label, chip_role = "role-phil", "Philosopher", "role-phil"
     elif domain in ("science", "physics"):
-        role_class, role_label = "role-scientist", "Scientist"
+        role_class, role_label, chip_role = "role-sci", "Scientist", "role-sci"
     else:
-        role_class, role_label = "role-author", "Author"
+        role_class, role_label, chip_role = "role-auth", "Author", "role-auth"
 
     def _era(b, d):
         def fmt(y):
@@ -305,12 +361,13 @@ def figure_card(row: dict) -> None:
     if len(bio) > 260:
         bio = bio[:260].rstrip() + "…"
 
-    chips = [f'<span class="chiplet role">{role_label}</span>']
+    # Role chip first (role-tinted ink), then optional school/era chip (neutral)
+    chips = [f'<span class="chiplet {chip_role}">{role_label}</span>']
     school = row.get("school")
     if school:
-        chips.append(f'<span class="chiplet neutral">{school}</span>')
+        chips.append(f'<span class="chiplet">{school}</span>')
     elif row.get("domain"):
-        chips.append(f'<span class="chiplet neutral">{row.get("domain").title()}</span>')
+        chips.append(f'<span class="chiplet">{row.get("domain").title()}</span>')
 
     links = []
     if row.get("wikipedia_link"):
@@ -340,18 +397,19 @@ def figure_card(row: dict) -> None:
 def hn_row_html(rank: int, title: str, host: str | None,
                 figure: str | None, points: int | None,
                 permalink: str | None) -> str:
+    """Per FIXES.md: title stays a <span class='hn-title'> (NOT <a>) so it doesn't
+    inherit anchor color. The permalink is left out of the visible HTML — keeping
+    the row text-only means our explicit colors win. Add a click-through later
+    via st.link_button if you want."""
     sub = " · ".join(filter(None, [host, figure]))
     pts = f'<span class="hn-points">{int(points) if points else 0} pts</span>'
     title_safe = (title or "").replace("<", "&lt;").replace(">", "&gt;")
-    link = (f'<a href="{permalink}" target="_blank" '
-            'style="color:inherit;text-decoration:none">') if permalink else ""
-    end_link = "</a>" if permalink else ""
     return (
         '<div class="hn-row">'
         f'  <div class="hn-rank">{rank:02d}</div>'
         '  <div class="hn-body">'
-        f'    {link}<span class="hn-title">{title_safe}</span>{end_link}'
-        f'    <div class="hn-sub">{sub}</div>'
+        f'    <span class="hn-title">{title_safe}</span>'
+        f'    <span class="hn-sub">{sub}</span>'
         '  </div>'
         f'  {pts}'
         '</div>'
@@ -361,12 +419,12 @@ def hn_row_html(rank: int, title: str, host: str | None,
 def host_progress_html(host: str, count: int, max_count: int) -> str:
     pct = (count / max_count * 100) if max_count else 0
     return (
-        '<div style="padding:8px 0;border-bottom:1px solid var(--hairline)">'
-        '  <div style="display:flex;justify-content:space-between;align-items:baseline">'
-        f'    <span style="font-family:var(--mono);font-size:12px;color:var(--ink2)">{host}</span>'
-        f'    <span style="font-family:var(--mono);font-size:11px;color:var(--ink3)">{count}</span>'
+        '<div class="host-row">'
+        '  <div class="host-head">'
+        f'    <span class="host-name">{host}</span>'
+        f'    <span class="host-val">{count}</span>'
         '  </div>'
-        f'  <div class="host-bar"><span style="width:{pct:.1f}%"></span></div>'
+        f'  <div class="host-bar"><i style="width:{pct:.1f}%"></i></div>'
         '</div>'
     )
 
@@ -722,7 +780,7 @@ with tab_exploit:
             st.markdown(
                 '<div style="display:flex;justify-content:space-between;align-items:center">'
                 '  <div><b>Streaming</b><div class="hint">1-min windows · Spark Structured Streaming</div></div>'
-                '  <span class="live-badge">LIVE</span>'
+                '  <span class="live-badge"><span class="pulse"></span>LIVE</span>'
                 '</div>',
                 unsafe_allow_html=True,
             )
@@ -770,7 +828,6 @@ with tab_exploit:
                 'SELECT-only guard</div>',
                 unsafe_allow_html=True,
             )
-            st.markdown('<div class="sql-box">', unsafe_allow_html=True)
             q = st.text_area(
                 label="SQL",
                 label_visibility="collapsed",
@@ -780,7 +837,6 @@ with tab_exploit:
                 height=150,
                 key="sql_query",
             )
-            st.markdown('</div>', unsafe_allow_html=True)
             run = st.button("Run query", type="primary", key="sql_run_btn")
             if run:
                 if not is_select_only(q):
