@@ -122,19 +122,23 @@ def d_arch():
     for sx, zx in [(19, 11), (50, 50), (81, 86)]:
         _arrow(ax, (zx, 73), (sx, 57), color=VIOLET, style="-", lw=1.0)
 
-    _panel(ax, 20, 12, 60, 18, "#fbf6ee", PLAN)
-    _txt(ax, 50, 25, "PLANNED — real-time mentions (Santi's branch)", 8.6,
-         PLAN, "bold")
+    _panel(ax, 20, 12, 60, 18, "#eaf3ee", GREEN)
+    _txt(ax, 50, 25, "STREAMING (LIVE) — real-time mentions", 8.6,
+         GREEN, "bold")
     _txt(ax, 50, 18.5,
          "Kafka → Spark Structured Streaming → Parquet → fact_mentions_1m  ⋈  dim_figure",
          7.6, NAVY)
-    _arrow(ax, (50, 42), (50, 30), color=PLAN, lw=1.2)
+    _arrow(ax, (50, 42), (50, 30), color=GREEN, lw=1.2)
+
+    # Streamlit BI seam — single-page dashboard reading all three stores.
+    _box(ax, 83, 4, 14, 6, "Streamlit\n:8501", AMBER, fs=7.2)
+    _arrow(ax, (90, 42), (90, 10), color=AMBER, style="-", lw=1.0)
 
     leg = [mpatches.Patch(color=c, label=l) for c, l in
            [(VIOLET, "Landing / Storage"), (BLUE, "Trusted"),
             (TEAL, "Exploitation"), (CORAL, "Consumption"),
-            (PLAN, "Planned")]]
-    ax.legend(handles=leg, loc="lower center", ncol=5, frameon=False,
+            (GREEN, "Streaming (live)"), (AMBER, "Dashboard")]]
+    ax.legend(handles=leg, loc="lower center", ncol=6, frameon=False,
               fontsize=7, bbox_to_anchor=(0.5, -0.03))
     return _save(fig, "d1.png")
 
@@ -152,23 +156,25 @@ def d_sources():
         ("Gutenberg catalog", "trusted_gutenberg_books · 166", "fact_works", GREEN),
         ("Gutenberg book text", "cleaned text in MinIO", "corpus_chunks (≈87k vectors — the bulk)", GREEN),
         ("GNews", "trusted_news_articles · 180", "fact_news_articles → Interviewer cue", GREEN),
+        ("Hacker News (Algolia)", "trusted_hn_stories · 169", "fact_hn_stories → Interviewer + dashboard", GREEN),
+        ("Kafka mentions stream", "streaming/fact_mentions_1m parquet", "fact_mentions_1m view → dashboard", GREEN),
         ("Stack Exchange", "trusted_se_q 500 / a 4 781", "fact_se_qa (all) · corpus_chunks (figure-linked only)", AMBER),
         ("Figure images", "trusted_philosopher_images · 126", "dim_figure: 1 primary portrait/figure only", AMBER),
         ("Podcast episodes", "trusted_podcast_episodes · 82", "NO consumer — unrelated true-crime audio", RED),
     ]
-    y = 86
-    dy = 9.0
-    _txt(ax, 13, y + 6, "DATASOURCE", 8, SLATE, "bold")
-    _txt(ax, 40, y + 6, "TRUSTED TABLE · ROWS", 8, SLATE, "bold")
-    _txt(ax, 76, y + 6, "EXPLOITATION / CONSUMPTION USE", 8, SLATE, "bold")
+    y = 89
+    dy = 7.6
+    _txt(ax, 13, y + 5, "DATASOURCE", 8, SLATE, "bold")
+    _txt(ax, 40, y + 5, "TRUSTED TABLE · ROWS", 8, SLATE, "bold")
+    _txt(ax, 76, y + 5, "EXPLOITATION / CONSUMPTION USE", 8, SLATE, "bold")
     for name, mid, use, c in rows:
-        _box(ax, 1, y - 3.4, 24, 6.8, name, c, fs=7.8)
-        _panel(ax, 27, y - 3.4, 26, 6.8, MIST, LINE)
-        _txt(ax, 40, y, mid, 7.3, NAVY)
-        _panel(ax, 55, y - 3.4, 44, 6.8, "white", c)
-        _txt(ax, 77, y, use, 7.0, NAVY)
-        _arrow(ax, (25, y), (27, y), color=c, lw=1.1)
-        _arrow(ax, (53, y), (55, y), color=c, lw=1.1)
+        _box(ax, 1, y - 2.9, 24, 5.8, name, c, fs=7.4)
+        _panel(ax, 27, y - 2.9, 26, 5.8, MIST, LINE)
+        _txt(ax, 40, y, mid, 7.0, NAVY)
+        _panel(ax, 55, y - 2.9, 44, 5.8, "white", c)
+        _txt(ax, 77, y, use, 6.7, NAVY)
+        _arrow(ax, (25, y), (27, y), color=c, lw=1.0)
+        _arrow(ax, (53, y), (55, y), color=c, lw=1.0)
         y -= dy
 
     leg = [mpatches.Patch(color=c, label=l) for c, l in
@@ -198,37 +204,46 @@ def d_star():
         ax.text(x + 1.6, y + h - 7.4, cols, fontsize=6.3, color=NAVY,
                 va="top", ha="left", zorder=5, linespacing=1.45)
 
-    tbox(38, 40, 25, 26, "dim_figure  (PK figure_slug)",
+    tbox(38, 41, 25, 22, "dim_figure  (PK figure_slug)",
          "name · domain · school\nborn · died · birth/death_full\nwikipedia_"
          "summary · _description\ninterests · wikipedia_link\nportrait_key  "
          "— 9 rows", TEAL)
 
-    tbox(2, 74, 28, 21, "fact_works  (book × figure)",
+    # Top row: three batch facts joined to dim_figure on figure_slug.
+    tbox(1, 76, 24, 19, "fact_works  (book × figure)",
          "book_id PK · figure_slug FK\ntitle · languages[] · subjects[]\n"
          "download_count · has_local_text\ncleaned_text_key — 166 rows", BLUE)
-    tbox(36, 76, 29, 19, "fact_quotes  (quote)",
+    tbox(26, 76, 24, 19, "fact_quotes  (quote)",
          "quote_id PK · figure_slug FK\nquote_text · quote_type\n(by_figure / "
          "about_figure)\nsource_work — 1 996 rows", BLUE)
-    tbox(70, 74, 28, 21, "fact_se_qa  (question)",
+    tbox(51, 76, 23, 19, "fact_se_qa  (question)",
          "question_id PK · score\ntop_answer_body (inlined)\n"
          "mentioned_figures[]\ntags[] — 500 rows", BLUE)
-    tbox(4, 8, 30, 20, "fact_news_articles  (article)",
+    tbox(75, 76, 23, 19, "fact_hn_stories  (story)  ★new",
+         "object_id PK · figure_slug FK\ntitle · host · points\nnum_comments · "
+         "url\ncreated_at — 169 rows", BLUE)
+    # Bottom row: streaming view, broad news, and the vector store.
+    tbox(1, 6, 23, 22, "fact_mentions_1m (view)  ★new",
+         "DuckDB view over Spark\nparquet (1-min windows)\nfigure_slug (mapped\n"
+         "from character_name)\nmention_count · avg_sentiment", GREEN)
+    tbox(26, 6, 24, 22, "fact_news_articles  (article)",
          "article_id PK · NO FK\ncategory · published_at\nsource_name · url\n"
          "— 180 rows", AMBER)
-    tbox(67, 6, 31, 22, "corpus_chunks  (Milvus)",
+    tbox(67, 4, 31, 24, "corpus_chunks  (Milvus)",
          "figure_slug (metadata filter)\nsource · subtype · chunk_text\n"
          "embedding 384-d (HNSW/COSINE)\n≈87 437 vectors", VIOLET)
 
-    for p in [(16, 74), (50, 76), (84, 74)]:
-        _arrow(ax, p, (50, 66), color=NAVY, style="-", lw=1.1)
-    _arrow(ax, (19, 28), (45, 40), color=NAVY, style="-", lw=1.1)
-    _arrow(ax, (82, 28), (58, 40), color=VIOLET, style="-", lw=1.1, rad=.1)
-    _txt(ax, 30, 35, "figure_slug  FK", 6.8, NAVY, st="italic")
-    _txt(ax, 70, 35, "slug = metadata\nfilter, not SQL FK", 6.4, VIOLET,
+    for p in [(13, 76), (38, 76), (62, 76), (86, 76)]:
+        _arrow(ax, p, (50, 63), color=NAVY, style="-", lw=1.0)
+    _arrow(ax, (12, 28), (45, 41), color=GREEN, style="-", lw=1.1)
+    _arrow(ax, (38, 28), (50, 41), color=NAVY, style="-", lw=1.1)
+    _arrow(ax, (82, 28), (58, 41), color=VIOLET, style="-", lw=1.1, rad=.1)
+    _txt(ax, 30, 36, "figure_slug  FK", 6.6, NAVY, st="italic")
+    _txt(ax, 70, 36, "slug = metadata\nfilter, not SQL FK", 6.2, VIOLET,
          st="italic")
-    _txt(ax, 19, 4, "news has no FK by design — GNews is category-broad; "
+    _txt(ax, 49, 2, "news has no FK by design — GNews is category-broad; "
                     "figure↔news relevance is decided at LLM prompt time",
-         6.6, SLATE, st="italic", ha="center")
+         6.4, SLATE, st="italic", ha="center")
     return _save(fig, "d3.png")
 
 
@@ -252,7 +267,7 @@ def d_consume():
         mid = (x1 + x2) / 2
         _txt(ax, mid, y + 2.6, label, 6.4, c, ha="center")
 
-    _txt(ax, 12, 80, "reads fact_news_articles\n+ identity card →\ncurated theme",
+    _txt(ax, 12, 80, "reads fact_news_articles\n+ fact_hn_stories\n+ identity card →\ncurated theme",
          6.2, SLATE, st="italic")
     step(74, 12, 32, "theme + opening Q", CORAL)
     step(68, 32, 52, "ask (Q, history)", "#9c6b9a")
@@ -275,28 +290,28 @@ def d_consume():
     return _save(fig, "d4.png")
 
 
-# ─── Diagram 5 — streaming seam ──────────────────────────────────────────────
+# ─── Diagram 5 — streaming seam (live) ───────────────────────────────────────
 def d_stream():
     fig, ax = _canvas(12, 4.0)
-    _txt(ax, 50, 95, "Figure 5 — Planned streaming integration & open decisions",
+    _txt(ax, 50, 95, "Figure 5 — Streaming seam, live: Kafka → Spark → Parquet → view",
          11.5, NAVY, "bold")
-    _box(ax, 2, 56, 16, 22, "Kafka 7.5\ncharacter-\nmentions", PLAN, fs=7.6)
+    _box(ax, 2, 56, 16, 22, "Kafka 7.5\ncharacter-\nmentions", GREEN, fs=7.6)
     _box(ax, 23, 56, 21, 22, "Spark 3.5\nStructured Stream\n1-min win · 30s wm",
-         PLAN, fs=7.4)
-    _box(ax, 49, 56, 19, 22, "Parquet\n/app/trusted/\nstreaming/", PLAN, fs=7.4)
-    _box(ax, 73, 56, 24, 22, "fact_mentions_1m\n⋈ dim_figure\n(Exploitation)",
+         GREEN, fs=7.4)
+    _box(ax, 49, 56, 19, 22, "Parquet\n./streaming/\nfact_mentions_1m", GREEN, fs=7.4)
+    _box(ax, 73, 56, 24, 22, "fact_mentions_1m  view\n⋈ dim_figure on name\n(Exploitation)",
          TEAL, fs=7.4)
-    _arrow(ax, (18, 67), (23, 67), color=PLAN)
-    _arrow(ax, (44, 67), (49, 67), color=PLAN)
+    _arrow(ax, (18, 67), (23, 67), color=GREEN)
+    _arrow(ax, (44, 67), (49, 67), color=GREEN)
     _arrow(ax, (68, 67), (73, 67), color=NAVY)
-    _txt(ax, 50, 44, "DECISIONS FOR THE SANTI SYNC", 8.5, RED, "bold")
+    _txt(ax, 50, 44, "DECISIONS, NOW SETTLED", 8.5, GREEN, "bold")
     ax.text(50, 22,
-            "1.  character_name ↔ figure_slug — reconcile keys or the join "
-            "silently drops rows\n"
-            "2.  read_parquet view (live, zero-copy) vs batch load into "
-            "exploit.duckdb (reproducible)\n"
-            "3.  Branch forked pre-Trusted → integrate by REBASE, never "
-            "fast-forward",
+            "1.  character_name → figure_slug — view maps via dim_figure.name "
+            "LEFT JOIN; unmapped surface as NULL (drift signal, not silent drop)\n"
+            "2.  Form: DuckDB read_parquet VIEW (live, zero-copy) — registered "
+            "once by fact_mentions_1m.py; no second copy of the data\n"
+            "3.  Integration: surgical file copy from origin/santi, not "
+            "fast-forward — preserves our Trusted/Exploitation work",
             ha="center", va="center", fontsize=7.6, color=NAVY,
             linespacing=1.7, zorder=5)
     return _save(fig, "d5.png")
@@ -434,22 +449,25 @@ def build():
                     "datasource usage, and design decisions", S["CoverSub"]),
           Spacer(1, 1 * cm), fig_img(d1, 15.5 * cm), Spacer(1, 8 * mm),
           Paragraph("Author&nbsp;: Albert Puiggròs &nbsp;|&nbsp; "
-                    "Status&nbsp;: pipeline green end-to-end &nbsp;|&nbsp; "
-                    "Streaming&nbsp;: planned integration (Santi)",
+                    "Status&nbsp;: pipeline green across all four zones "
+                    "&nbsp;|&nbsp; Streaming&nbsp;: live &nbsp;|&nbsp; "
+                    "BI seam&nbsp;: Streamlit dashboard on :8501",
                     S["CoverSub"]),
           PageBreak()]
 
     # ── contents ──
     toc = ["1 — Executive summary", "2 — System architecture &amp; the "
            "three-store decision", "3 — Datasource inventory: what we use, "
-           "partially use, and do not", "4 — Trusted Zone (interface recap)",
+           "partially use, and do not (incl. the HN pivot)",
+           "4 — Trusted Zone (interface recap)",
            "5 — Exploitation Zone: the star schema in full",
            "6 — Consumption Zone: the conversational podcast",
            "7 — Technology stack (named &amp; versioned)",
            "8 — Orchestration &amp; runtime",
            "9 — Design-decision register",
-           "10 — Planned streaming integration (Santi sync)",
-           "11 — Status &amp; next steps"]
+           "10 — Streaming integration (live)",
+           "11 — BI seam: the Streamlit dashboard",
+           "12 — Status &amp; next steps"]
     e += [Paragraph("Contents", S["H2"]), Spacer(1, 4)]
     e += [Paragraph(x, S["TOC"]) for x in toc]
     e += [PageBreak()]
@@ -503,16 +521,36 @@ def build():
 
     # ── 3 ──
     e += [H1("3", "Datasource inventory — used, partially used, unused"),
-          P("Nine datasources were ingested. Honesty about which ones the "
-            "product actually consumes is itself a design statement: we keep "
-            "partially-used and unused sources visible rather than hiding "
-            "them, and we never pretend an unrelated source feeds the "
-            "product."),
+          P("Ten datasources flow into the product (eight batch + one "
+            "streaming + the Algolia API added late in development). Honesty "
+            "about which ones the product actually consumes is itself a "
+            "design statement: we keep partially-used and unused sources "
+            "visible rather than hiding them, and we never pretend an "
+            "unrelated source feeds the product."),
           fig_img(d2),
           Paragraph("Figure 2 — Every datasource, its conformed Trusted table "
-                    "with live row counts, and exactly where it is consumed.",
+                    "with live row counts, and exactly where it is consumed. "
+                    "Two new green rows — Hacker News (Algolia) and the live "
+                    "Kafka mentions stream — are this iteration's additions.",
                     S["Cap"]),
-          Paragraph("3.1 · The honest edges", S["H2"]),
+          Paragraph("3.1 · Hacker News (new this iteration, replacing Reddit)",
+                    S["H2"]),
+          P("The original plan was a Reddit ingester (Santi's PoC). Reddit's "
+            "unauthenticated search endpoint started returning a browser-check "
+            "HTML page (HTTP 403) for all programmatic clients in 2026, and "
+            "their OAuth flow is gated by a &ldquo;Responsible Builder "
+            "Policy&rdquo; that several team accounts could not pass. We "
+            "pivoted to the <b>HN Algolia API</b>: open, no auth, "
+            "quoted-phrase search, and HN's audience produces much higher "
+            "signal-to-noise for our nine figures (the top &ldquo;Immanuel "
+            "Kant&rdquo; HN hit is a 242-point philosophy primer; the top "
+            "Reddit hit was a Spanish recipe post matching <i>plato</i> as a "
+            "substring). The fact joins dim_figure on figure_slug and is "
+            "consumed both by the Streamlit dashboard and — alongside the "
+            "GNews fact — by the Interviewer agent as discourse-signal "
+            "inspiration (§6.3). The Reddit→HN pivot itself is recorded in "
+            "the design-decision register (§9, D13)."),
+          Paragraph("3.2 · The honest edges", S["H2"]),
           B("<b>Stack Exchange (partial).</b> All 500 questions with their "
             "best answer inlined populate <font face='Helvetica-Oblique'>"
             "fact_se_qa</font> for the dashboard, but <i>only figure-linked</i> "
@@ -521,9 +559,10 @@ def build():
             "figure's RAG context, so it is deliberately excluded."),
           B("<b>Figure images (partial).</b> 126 portrait records were "
             "ingested; <font face='Helvetica-Oblique'>dim_figure</font> keeps "
-            "only the single primary portrait key per figure (for a future "
-            "dashboard/UI). The remaining images and the image bytes have no "
-            "podcast consumer and are intentionally left unconsumed."),
+            "only the single primary portrait key per figure, and the "
+            "Streamlit dashboard now renders these as the figure cards in "
+            "the Exploitation tab. The remaining images and the image bytes "
+            "have no podcast consumer and are intentionally left unconsumed."),
           B("<b>Podcast episodes (unused).</b> "
             "<font face='Helvetica-Oblique'>trusted_podcast_episodes</font> "
             "(82 rows) is true-crime / entertainment audio metadata "
@@ -556,11 +595,13 @@ def build():
             "<b>star schema</b> plus a <b>vector corpus</b>. A star schema is "
             "the right model because every analytical and conversational "
             "question is &ldquo;something <i>about a figure</i>&rdquo;: one "
-            "conformed dimension, several fact tables radiating from it, no "
-            "snowflaking. All tabular work is pure DuckDB SQL — source and "
-            "target are both DuckDB and the joins span &lt;50 dimension rows, "
-            "so a Spark JVM would add startup cost with zero throughput gain. "
-            "Spark is used in exactly one Exploitation job: embedding (§5.4)."),
+            "conformed dimension, five materialised fact tables and one live "
+            "view radiating from it, no snowflaking. All batch tabular work "
+            "is pure DuckDB SQL — source and target are both DuckDB and the "
+            "joins span &lt;50 dimension rows, so a Spark JVM would add "
+            "startup cost with zero throughput gain. Spark is used in exactly "
+            "two Exploitation jobs: embedding (§5.4) and the streaming "
+            "aggregator that feeds the live view (§5.5)."),
           fig_img(d3),
           Paragraph("Figure 3 — The conformed dimension, four facts, and the "
                     "Milvus corpus, with grain, keys and representative "
@@ -591,7 +632,17 @@ def build():
                ["fact_se_qa", "question",
                 "Top answer inlined (accepted &gt; highest score) to save a "
                 "join; mentioned_figures[] derived via tag-prefix + "
-                "word-boundary regex on title/body (e.g. cartesian→descartes)"]],
+                "word-boundary regex on title/body (e.g. cartesian→descartes)"],
+               ["fact_hn_stories", "story × figure",
+                "INNER JOIN dim_figure; derived <i>host</i> column from URL "
+                "(nytimes.com, github.com, …) groups discourse by venue. The "
+                "ingester searches per-figure with quoted-phrase queries so "
+                "figure_slug is set at landing, not back-inferred"],
+               ["fact_mentions_1m", "1-min window × figure",
+                "<i>View</i>, not a table — read_parquet over the Spark "
+                "streaming output, LEFT JOIN dim_figure on name to map "
+                "character_name→figure_slug. Idempotent, zero-copy, sees new "
+                "windows the moment Spark flushes them"]],
               [2.7 * cm, 2.4 * cm, 11.4 * cm]),
           Paragraph("5.3 · Why news has no foreign key", S["H2"]),
           P("This is a deliberate modelling decision, not an omission. "
@@ -620,7 +671,24 @@ def build():
             "load — memory is constant regardless of corpus size. The naive "
             "alternative (collect() everything, load the model per partition) "
             "is what fails to scale; demonstrating that contrast is the point "
-            "of using Spark here at all.")]
+            "of using Spark here at all."),
+          Paragraph("5.5 · fact_mentions_1m — the streaming view", S["H2"]),
+          P("The hot-path Spark Structured Streaming job (Figure 5) "
+            "consumes the Kafka <font face='Helvetica-Oblique'>"
+            "character-mentions</font> topic, windows to 1-minute tumbles "
+            "with a 30s watermark, aggregates by (character_name, domain), "
+            "and writes Parquet to <font face='Helvetica-Oblique'>"
+            "./streaming/fact_mentions_1m/</font>. An Exploitation script "
+            "registers a DuckDB <font face='Helvetica-Oblique'>read_parquet"
+            "</font> VIEW over that directory, mapping "
+            "<font face='Helvetica-Oblique'>character_name</font> to "
+            "<font face='Helvetica-Oblique'>figure_slug</font> via a LEFT "
+            "JOIN on <font face='Helvetica-Oblique'>dim_figure.name</font>. "
+            "The view is <b>idempotent</b> (recreating it is free), "
+            "<b>zero-copy</b> (no second materialisation of the data), and "
+            "<b>NULL-on-drift</b>: unmapped character names surface as "
+            "figure_slug=NULL rather than silently disappearing — a visible "
+            "data-quality signal, not a hidden join failure.")]
 
     # ── 6 ──
     e += [H1("6", "Consumption Zone — the conversational podcast"),
@@ -648,12 +716,19 @@ def build():
             "interview question so the exemplars are topically adjacent. The "
             "result is injected as a style block that changes how the answer "
             "<i>sounds</i>, never what it asserts."),
-          Paragraph("6.3 · Interviewer — a topic curator (not a news reader)",
+          Paragraph("6.3 · Interviewer — a topic curator over two ambient signals",
                     S["H2"]),
           P("The Interviewer curates evergreen, intellectually rich themes "
             "(the nature of AI, scientific truth, social behaviour, ethics) "
-            "and uses headlines only as loose inspiration when they genuinely "
-            "fit the figure. It opens with a curated question, then generates "
+            "and uses ambient discourse only as loose inspiration when it "
+            "genuinely fits the figure. Two signals feed the curator side by "
+            "side: <font face='Helvetica-Oblique'>fact_news_articles</font> "
+            "(broad daily GNews — world / tech / science) and "
+            "<font face='Helvetica-Oblique'>fact_hn_stories</font> (per-figure "
+            "Hacker News stories ranked by points). HN matters because GNews "
+            "alone is mostly geopolitics; HN's audience produces the "
+            "long-form intellectual pieces a curator actually wants. The "
+            "Interviewer opens with one curated question, then generates "
             "each follow-up from the transcript so far — a real adaptive "
             "interview, not a fixed questionnaire."),
           callout("Content-safety hazard — and the structural fix",
@@ -692,11 +767,12 @@ def build():
             "for its own sake."),
           tbl(["Layer", "Tool", "Version", "Role / justification"],
               [["Orchestration", "Apache Airflow", "2.9.0",
-                "Two DAGs, LocalExecutor; trusted auto-triggers exploitation"],
+                "Three DAGs, LocalExecutor; trusted auto-triggers exploitation"],
                ["Airflow metadata", "PostgreSQL", "13",
                 "Airflow's own backend DB"],
                ["Batch processing", "Apache Spark (PySpark)", "3.5.x",
-                "Trusted cleaning + the one embedding job (Java 17 JRE)"],
+                "Trusted cleaning + the embedding job + the streaming "
+                "aggregator (Java 17 JRE)"],
                ["Tabular store", "DuckDB", "1.x",
                 "trusted.duckdb + exploit.duckdb; single-writer"],
                ["Object store", "MinIO + mc", "latest",
@@ -709,8 +785,13 @@ def build():
                 "all-MiniLM-L6-v2, 384-d (CPU torch 2.x)"],
                ["LLM", "Anthropic Claude", "SDK ≥0.40",
                 "claude-sonnet-4-6 default; provider-swappable llm_fn"],
-               ["Streaming (planned)", "Kafka + Spark SS", "cp-kafka 7.5.0",
-                "character-mentions topic → fact_mentions_1m"],
+               ["HN ingestion", "HN Algolia REST API", "v1",
+                "Public, no auth; quoted-phrase search per figure (replaces "
+                "Reddit, §9 D13)"],
+               ["Streaming (live)", "Kafka + Spark SS", "cp-kafka 7.5.0",
+                "character-mentions topic → Parquet → fact_mentions_1m view"],
+               ["BI seam", "Streamlit", "≥1.32",
+                "Single-page dashboard on :8501; 6 tabs over the four zones"],
                ["Interchange", "PyArrow / Parquet", "≥15",
                 "Streaming output; deltalake present, not yet used"],
                ["Report tooling", "matplotlib + reportlab", "3.10 / 4.5",
@@ -727,7 +808,8 @@ def build():
             "and Milvus health, builds dim_figure, then the facts."),
           callout("Why fact builds are serialised",
                    "DuckDB is single-writer: concurrent writers collide on "
-                   "the file lock. The four fact builds are therefore chained "
+                   "the file lock. The five fact-table builds plus the "
+                   "fact_mentions_1m view registration are therefore chained "
                    "with Airflow's chain() rather than parallelised — "
                    "correctness over a few seconds of wall-clock. "
                    "corpus_chunks then embeds, and two verifier tasks (DuckDB "
@@ -772,58 +854,112 @@ def build():
                 "No invented native language; honest seed for TTS"],
                ["D11", "Serialise fact builds",
                 "DuckDB single-writer file lock"],
-               ["D12", "Streaming stays Parquet, integrates by rebase",
-                "Santi's branch forked pre-Trusted; fast-forward would delete "
-                "our work"]],
+               ["D12", "Streaming surfaces as a DuckDB view, not a copy",
+                "Idempotent, zero-copy, NULL-on-drift; integrated by surgical "
+                "file copy from origin/santi, never fast-forward"],
+               ["D13", "Pivot Reddit → Hacker News (Algolia)",
+                "Reddit's 2026 unauthenticated endpoint returns a "
+                "browser-check 403; OAuth gated by Responsible Builder Policy. "
+                "HN Algolia is open, has higher signal-to-noise for our nine "
+                "figures, and the data-source contract (per-figure quoted "
+                "search → daily JSON → fact_*) is identical — only the URL "
+                "moved"],
+               ["D14", "Streamlit dashboard reads every store directly",
+                "Read-only over duckdb files, streaming parquet, and Milvus; "
+                "no API server in front. Smallest possible BI seam, fully "
+                "consistent with consumer-justified design"]],
               [1.1 * cm, 5.1 * cm, 10.3 * cm])]
 
     # ── 10 ──
-    e += [H1("10", "Planned streaming integration (Santi sync)"),
-          P("Santi's branch runs a Spark Structured Streaming job: it reads "
-            "the Kafka <font face='Helvetica-Oblique'>character-mentions</font> "
-            "topic, applies a 1-minute tumbling window with a 30-second "
-            "watermark, aggregates to (window_start, window_end, "
-            "character_name, domain, mention_count, avg_sentiment) and writes "
-            "Parquet to <font face='Helvetica-Oblique'>"
-            "/app/trusted/streaming/fact_mentions_1m</font>. It slots into the "
-            "Exploitation Zone as a real-time fact joining dim_figure."),
+    e += [H1("10", "Streaming integration (live)"),
+          P("The hot path that was &ldquo;planned&rdquo; at design submission "
+            "is now wired end-to-end and runs in the same Docker stack as "
+            "everything else. A Python Kafka producer "
+            "(<font face='Helvetica-Oblique'>ingestion/stream_producer.py</font>) "
+            "emits synthetic character-mention events to the Kafka "
+            "<font face='Helvetica-Oblique'>character-mentions</font> topic at "
+            "1–5 s intervals. A Spark Structured Streaming job "
+            "(<font face='Helvetica-Oblique'>"
+            "ingestion/spark_stream_mentions_1m.py</font>) consumes that "
+            "topic, applies a 1-minute tumbling window with a 30 s watermark, "
+            "aggregates to (window_start, window_end, character_name, domain, "
+            "mention_count, avg_sentiment) and writes Parquet to "
+            "<font face='Helvetica-Oblique'>./streaming/fact_mentions_1m/</font>."),
           fig_img(d5),
-          Paragraph("Figure 5 — The streaming seam and the three decisions to "
-                    "settle in the sync.", S["Cap"]),
-          B("<b>Naming.</b> <font face='Helvetica-Oblique'>character_name"
-            "</font> must reconcile with our <font face='Helvetica-Oblique'>"
-            "figure_slug</font> key, or the join silently drops every row."),
-          B("<b>Landing form.</b> A DuckDB <font face='Helvetica-Oblique'>"
-            "read_parquet</font> view (always fresh, zero-copy) versus a "
-            "periodic batch load into exploit.duckdb (reproducible offline). "
-            "Recommendation: a live view for the KPI, materialised on DAG run "
-            "for reproducibility."),
-          B("<b>Merge.</b> origin/santi forked <i>before</i> our Trusted "
-            "commits, so its diff shows our work as deleted — integration is a "
-            "<b>rebase</b>, never a fast-forward."),
-          P("Once joined, fact_mentions_1m gives the dashboard a live "
-            "&ldquo;who is being discussed now&rdquo; signal and can feed the "
-            "Interviewer a real-time topical cue — closing the loop between "
-            "the streaming and consumption ends of the pipeline.")]
+          Paragraph("Figure 5 — The streaming seam, end-to-end live. The "
+                    "three open decisions from the design phase are now "
+                    "settled and stated in-figure.", S["Cap"]),
+          P("In the Exploitation Zone, "
+            "<font face='Helvetica-Oblique'>exploitation/structured/"
+            "fact_mentions_1m.py</font> registers a DuckDB "
+            "<font face='Helvetica-Oblique'>VIEW</font> over the parquet "
+            "directory (read_parquet with union_by_name) and LEFT JOINs "
+            "dim_figure on the human-readable name to attach figure_slug. "
+            "The view is recreated idempotently on every Exploitation DAG "
+            "run, never copies data, and surfaces unmapped character names "
+            "as figure_slug=NULL — a deliberate drift signal."),
+          P("The synthetic-mention seam is honest about being synthetic "
+            "(stream_producer.py uses hardcoded templates and randomised "
+            "sentiment) — it exists to demonstrate the streaming wiring, "
+            "not to model real public discourse. That role is filled by the "
+            "HN Algolia source (§3.1, §6.3) on the cold path.")]
 
-    # ── 11 ──
-    e += [H1("11", "Status &amp; next steps"),
+    # ── 11 — BI seam ──
+    e += [H1("11", "BI seam — the Streamlit dashboard"),
+          P("A single-page Streamlit app on port 8501 surfaces all four "
+            "zones in one place. It reads each store directly — no API "
+            "server in front — so the dashboard is the cheapest possible "
+            "BI seam consistent with the consumer-justified principle: it "
+            "is a thin viewer, not a parallel data plane."),
+          tbl(["Tab", "Reads", "What it shows"],
+              [["Landing", "MinIO list-objects",
+                "Files per source, total MB, browsable object list"],
+               ["Trusted", "trusted.duckdb",
+                "Row counts per cleaned table + 50-row peek"],
+               ["Exploitation", "exploit.duckdb",
+                "Figure cards (portrait + bio + links), star-schema queries, "
+                "HN discourse panel (stories per figure, top hosts, top "
+                "stories), custom-SQL textarea"],
+               ["Streaming", "fact_mentions_1m parquet",
+                "Live window rows, total mentions per character, avg sentiment "
+                "by domain"],
+               ["Milvus", "corpus_chunks (gRPC)",
+                "Collection stats and a semantic-search playground "
+                "(figure × query → top-K passages with cosine scores) — the "
+                "same retrieval the Reasoner uses, exposed for inspection"],
+               ["Episodes", "consumption/episodes/",
+                "Generated podcast Markdown rendered in-page"]],
+              [2.5 * cm, 4.5 * cm, 9.5 * cm]),
+          P("Every panel degrades gracefully when its source isn't "
+            "populated yet (e.g. Milvus tab shows &ldquo;not found&rdquo; "
+            "before the embedding job has run) — the dashboard remains "
+            "usable at every stage of the pipeline build-up.")]
+
+    # ── 12 — Status ──
+    e += [H1("12", "Status &amp; next steps"),
           tbl(["Component", "Consumer", "Status"],
-              [["dim_figure + 4 facts", "Dashboard KPIs, agents", "Green"],
+              [["dim_figure + 5 facts + 1 view",
+                "Dashboard KPIs, agents", "Green · live"],
                ["corpus_chunks (Milvus)", "Reasoner / Voice RAG",
                 "Green · ≈87,437"],
                ["Conversational podcast", "End user (demo)", "Green · live"],
                ["Bio voice_descriptor", "Text register + future TTS",
-                "Done this iteration"],
-               ["Streamlit dashboard", "Project demo", "Planned"],
-               ["fact_mentions_1m", "Real-time KPI", "Planned (Santi)"],
+                "Done previous iteration"],
+               ["HN Algolia source", "Interviewer + dashboard",
+                "Green · 169 stories / 8 figures / 105 hosts"],
+               ["fact_mentions_1m (streaming)", "Dashboard live tile",
+                "Green · view live"],
+               ["Streamlit dashboard", "Project demo + grading",
+                "Green · 6 tabs incl. Milvus search playground"],
                ["Text-to-speech", "Audio episode", "Planned"]],
               [5 * cm, 6 * cm, 5.5 * cm]),
-          P("The pipeline is green end-to-end: the Trusted DAG auto-triggers "
-            "the Exploitation DAG, both succeed, the vector corpus verifies, "
-            "and live episodes generate. The immediate next steps are the "
-            "Streamlit dashboard, the streaming integration with Santi (§10), "
-            "and the text-to-speech path seeded by the bio descriptor (§6.4).")]
+          P("The pipeline is green end-to-end across all four zones plus "
+            "the BI seam. The three DAGs chain correctly, the vector corpus "
+            "verifies, the streaming view picks up live windows, the "
+            "Interviewer reads both ambient signals, and the dashboard "
+            "surfaces every store. The remaining work is the text-to-speech "
+            "path seeded by the bio descriptor (§6.4) — explicitly out of "
+            "scope for this deliverable and noted only for completeness.")]
 
     doc.build(e, onFirstPage=_chrome, onLaterPages=_chrome)
     return OUT
