@@ -85,8 +85,33 @@ CSS = """
   --primary:#6B5BF2; --primary2:#8C7CF8; --soft:#EFEBFF;
 }
 .stApp{ background:var(--bg); }
-html, body, [class*="css"]{ font-family:'Inter',sans-serif; }
 .block-container{ padding-top:2rem; max-width:1380px; }
+
+/* === Force the font stack on EVERY Streamlit component (the per-component
+   CSS Streamlit ships has higher specificity than `html, body { font-family }`,
+   so without !important on broader selectors the system fallback wins) === */
+html, body, .stApp, .stApp *,
+section[data-testid="stSidebar"] *,
+.stButton button, .stDownloadButton button,
+.stSelectbox *, .stMultiSelect *, .stRadio *, .stCheckbox *,
+.stTextInput input, .stNumberInput input, .stTextArea textarea,
+.stDataFrame, .stDataFrame *, .stTable, .stTable *,
+.stMarkdown, .stMarkdown *, .element-container,
+[data-testid="stMarkdownContainer"], [data-testid="stMarkdownContainer"] *{
+  font-family:'Inter','-apple-system','Segoe UI',sans-serif !important;
+}
+.stApp h1, .stApp h2, .stApp h3, .stApp h4, .stApp h5, .stApp h6,
+[data-testid="stHeading"], [data-testid="stHeading"] *,
+[data-testid="stMarkdownContainer"] h1,
+[data-testid="stMarkdownContainer"] h2,
+[data-testid="stMarkdownContainer"] h3,
+.page-title, .sidebar-brand .name{
+  font-family:'Poppins',sans-serif !important;
+}
+.stTextArea textarea, .stCode pre, .stCode code,
+.hn-rank, .hn-sub, .host-name, .fig-dates, .hint{
+  font-family:'JetBrains Mono',monospace !important;
+}
 
 /* === Streamlit's own text defaults (white-on-white culprits) === */
 .stApp h1, .stApp h2, .stApp h3, .stApp h4, .stApp h5, .stApp h6,
@@ -178,11 +203,13 @@ section[data-testid="stSidebar"] .stCode code{
   background:#fff; border:1px solid #ECEDF6; border-radius:16px; padding:18px;
   box-shadow:0 4px 14px rgba(36,37,80,.04);
   transition:box-shadow .18s, transform .18s, border-color .18s;
+  display:flex; flex-direction:column; gap:13px;
+  min-height:200px; overflow:hidden;
 }
 .figure-card:hover{ box-shadow:0 10px 30px rgba(36,37,80,.06); transform:translateY(-2px); border-color:#E3E1FB; }
-.figure-card .fig-top{ display:flex; gap:14px; align-items:center; }
-.figure-card .fig-meta{ display:flex; flex-direction:column; gap:4px; }
-.figure-card .fig-tags{ display:flex; gap:6px; margin-top:4px; flex-wrap:nowrap; }
+.figure-card .fig-top{ display:flex; gap:14px; align-items:flex-start; min-height:60px; }
+.figure-card .fig-meta{ display:flex; flex-direction:column; gap:4px; flex:1; min-width:0; }
+.figure-card .fig-tags{ display:flex; gap:6px; margin-top:4px; flex-wrap:wrap; }
 .figure-card .portrait{
   width:60px; height:60px; border-radius:16px; display:grid; place-items:center;
   font-family:'Poppins'; font-weight:700; font-size:22px; color:#fff !important; flex:none;
@@ -246,11 +273,29 @@ section[data-testid="stSidebar"] .stCode code{
 }
 .stTextArea textarea{
   background:#1E1E33 !important; color:#D7D7F2 !important; border:1px solid #2C2C49 !important;
-  border-radius:12px !important; font-family:'JetBrains Mono' !important; font-size:12.5px !important;
+  border-radius:12px !important; font-family:'JetBrains Mono', monospace !important; font-size:12.5px !important;
 }
-.stTextInput input{ border-radius:12px !important; border:1px solid var(--border) !important;
-  font-family:'JetBrains Mono' !important; color:var(--ink) !important; }
-.stSelectbox > div > div{ border-radius:12px !important; border:1px solid var(--border) !important; color:var(--ink) !important; }
+/* Light text inputs (Milvus search query, etc.) — explicit white background
+   so they don't inherit dark from any ancestor. */
+.stTextInput input, .stNumberInput input{
+  background:#FFFFFF !important; color:#25253C !important;
+  border-radius:12px !important; border:1px solid var(--border) !important;
+  font-family:'Inter', sans-serif !important; font-size:13px !important;
+}
+.stTextInput input::placeholder, .stNumberInput input::placeholder{ color:#9A9AB4 !important; }
+
+/* Selectbox: the BaseWeb internals need both the outer container AND the
+   value display targeted, with explicit background. */
+.stSelectbox div[data-baseweb="select"] > div{
+  background:#FFFFFF !important; border:1px solid var(--border) !important;
+  border-radius:12px !important; color:#25253C !important;
+}
+.stSelectbox div[data-baseweb="select"] *{ color:#25253C !important; }
+/* Open dropdown menu */
+div[data-baseweb="popover"] li, div[data-baseweb="popover"] div{
+  background:#FFFFFF !important; color:#25253C !important;
+}
+div[data-baseweb="popover"] li:hover{ background:#EFEBFF !important; }
 
 /* ---- dataframe + charts ---- */
 .stDataFrame{ border:1px solid var(--border); border-radius:14px; overflow:hidden; }
@@ -540,9 +585,35 @@ with tab_landing:
                 latest = pd.to_datetime(df["LastModified"]).max()
                 metric_tile(latest.strftime("%Y-%m-%d"), "Latest write", "UTC snapshot", "pink", "quote")
 
-            with st.container(border=True):
+            try:
+                import altair as alt
+                HAS_ALT_L = True
+            except ImportError:
+                HAS_ALT_L = False
+
+            l1, l2 = st.columns([1.2, 1])
+            with l1, st.container(border=True):
                 st.markdown("**Files by source**")
-                st.bar_chart(df.groupby("Source").size().rename("Files"))
+                src_df = df.groupby("Source").size().reset_index(name="files")
+                if HAS_ALT_L:
+                    chart = (alt.Chart(src_df)
+                             .mark_bar(color="#8C7CF8", cornerRadius=4)
+                             .encode(x=alt.X("Source:N", sort="-y", title=None),
+                                     y=alt.Y("files:Q", title=None)))
+                    st.altair_chart(chart, use_container_width=True)
+                else:
+                    st.bar_chart(src_df.set_index("Source"))
+            with l2, st.container(border=True):
+                st.markdown("**Size distribution (MB) by source**")
+                size_df = df.groupby("Source")["Size_MB"].sum().reset_index()
+                if HAS_ALT_L:
+                    chart = (alt.Chart(size_df)
+                             .mark_bar(color="#3FCF8E", cornerRadius=4)
+                             .encode(x=alt.X("Source:N", sort="-y", title=None),
+                                     y=alt.Y("Size_MB:Q", title=None)))
+                    st.altair_chart(chart, use_container_width=True)
+                else:
+                    st.bar_chart(size_df.set_index("Source"))
 
             with st.expander(f"Browse {len(df):,} objects"):
                 st.dataframe(
@@ -582,16 +653,33 @@ with tab_trusted:
             with cols[2]:
                 metric_tile(f"{int(counts['rows'].max()):,}", "Largest table", str(counts.loc[counts['rows'].idxmax(), 'table']), "peach", "pulse")
 
-            with st.container(border=True):
-                st.markdown("**Row counts per table**")
-                st.bar_chart(counts.set_index("table")["rows"])
+            try:
+                import altair as alt
+                HAS_ALT_T = True
+            except ImportError:
+                HAS_ALT_T = False
 
-            with st.expander("Peek at a table"):
-                pick = st.selectbox("Table", counts["table"].tolist())
-                st.dataframe(
-                    con.execute(f"SELECT * FROM {pick} LIMIT 50").fetch_df(),
-                    use_container_width=True,
-                )
+            with st.container(border=True):
+                st.markdown("**Row counts per table** — log scale (a single huge table would otherwise flatten the rest)")
+                if HAS_ALT_T:
+                    chart = (alt.Chart(counts.sort_values("rows", ascending=False))
+                             .mark_bar(color="#8C7CF8", cornerRadius=4)
+                             .encode(
+                                 x=alt.X("table:N", sort="-y", title=None,
+                                         axis=alt.Axis(labelAngle=-30)),
+                                 y=alt.Y("rows:Q", scale=alt.Scale(type="log"), title=None),
+                             ))
+                    st.altair_chart(chart, use_container_width=True)
+                else:
+                    st.bar_chart(counts.set_index("table")["rows"])
+
+            with st.container(border=True):
+                st.markdown("**Peek at a table**")
+                pick = st.selectbox("Table", counts["table"].tolist(), key="trusted_table_pick")
+                preview = con.execute(f"SELECT * FROM {pick} LIMIT 50").fetch_df()
+                st.markdown(f'<div class="hint">{len(preview)} of {int(counts.loc[counts.table==pick, "rows"].iloc[0]):,} rows</div>',
+                            unsafe_allow_html=True)
+                st.dataframe(preview, use_container_width=True)
         con.close()
 
 # ─── Tab 3: Exploitation — PRIMARY SPEC (A → F per HANDOFF.md) ───────────────
@@ -870,6 +958,12 @@ with tab_stream:
         )
     else:
         df = pd.read_parquet(STREAMING_PATH)
+        try:
+            import altair as alt
+            HAS_ALT_S = True
+        except ImportError:
+            HAS_ALT_S = False
+
         cols = st.columns(3)
         with cols[0]:
             metric_tile(f"{len(df):,}", "Window rows", "1-min tumbling", "lilac", "pulse")
@@ -878,15 +972,57 @@ with tab_stream:
         with cols[2]:
             metric_tile(str(df["window_end"].max())[:19], "Latest window", "UTC", "peach", "quote")
 
+        # Time-series area chart of total mentions per window
         with st.container(border=True):
-            st.markdown("**Total mentions by character**")
-            st.bar_chart(
-                df.groupby("character_name")["mention_count"]
-                  .sum().sort_values(ascending=False)
+            st.markdown(
+                '<div style="display:flex;justify-content:space-between;align-items:center">'
+                '  <div><b>Mentions over time</b><div class="hint">aggregate count per 1-min window</div></div>'
+                '  <span class="live-badge"><span class="pulse"></span>LIVE</span>'
+                '</div>',
+                unsafe_allow_html=True,
             )
-        with st.container(border=True):
+            ts = (df.groupby("window_end")["mention_count"].sum()
+                    .reset_index().sort_values("window_end"))
+            if HAS_ALT_S and not ts.empty:
+                chart = (alt.Chart(ts)
+                         .mark_area(
+                             line={"color": "#6B5BF2", "strokeWidth": 2},
+                             color=alt.Gradient(
+                                 gradient="linear",
+                                 stops=[alt.GradientStop(color="#8C7CF8", offset=0),
+                                        alt.GradientStop(color="#F4F5FB", offset=1)],
+                                 x1=0, x2=0, y1=0, y2=1,
+                             ),
+                             opacity=0.55,
+                         )
+                         .encode(x=alt.X("window_end:T", title=None),
+                                 y=alt.Y("mention_count:Q", title=None)))
+                st.altair_chart(chart, use_container_width=True)
+
+        s1, s2 = st.columns(2)
+        with s1, st.container(border=True):
+            st.markdown("**Total mentions by character**")
+            mc = (df.groupby("character_name")["mention_count"].sum()
+                    .reset_index().sort_values("mention_count", ascending=False))
+            if HAS_ALT_S:
+                chart = (alt.Chart(mc)
+                         .mark_bar(color="#8C7CF8", cornerRadius=4)
+                         .encode(x=alt.X("character_name:N", sort="-y", title=None),
+                                 y=alt.Y("mention_count:Q", title=None)))
+                st.altair_chart(chart, use_container_width=True)
+            else:
+                st.bar_chart(mc.set_index("character_name"))
+        with s2, st.container(border=True):
             st.markdown("**Average sentiment by domain**")
-            st.bar_chart(df.groupby("domain")["avg_sentiment"].mean())
+            sd = df.groupby("domain")["avg_sentiment"].mean().reset_index()
+            if HAS_ALT_S:
+                chart = (alt.Chart(sd)
+                         .mark_bar(color="#3FCF8E", cornerRadius=4)
+                         .encode(x=alt.X("domain:N", sort="-y", title=None),
+                                 y=alt.Y("avg_sentiment:Q", title=None)))
+                st.altair_chart(chart, use_container_width=True)
+            else:
+                st.bar_chart(sd.set_index("domain"))
 
         with st.expander(f"All {len(df):,} window rows"):
             st.dataframe(
@@ -1069,14 +1205,32 @@ with tab_episodes:
         if not md_files:
             st.info("No episodes yet. Run `consumption/episode.py`.")
         else:
-            cols = st.columns([2, 1])
-            with cols[1]:
-                metric_tile(str(len(md_files)), "Episodes generated", "Markdown transcripts", "lilac", "quote")
+            cols = st.columns(3)
             with cols[0]:
+                metric_tile(str(len(md_files)), "Episodes generated", "Markdown transcripts", "lilac", "quote")
+            with cols[1]:
+                # Try to count distinct figures (filename prefix before _)
+                figs = {f.name.split("_")[0] for f in md_files}
+                metric_tile(str(len(figs)), "Figures covered", ", ".join(sorted(figs))[:40], "mint", "people")
+            with cols[2]:
+                latest = md_files[0]
+                ts = latest.name.replace(".md", "").split("_")[-1]
+                metric_tile(ts, "Latest episode", latest.name.split("_")[0], "peach", "book")
+
+            with st.container(border=True):
+                st.markdown("**Pick an episode**")
                 choice = st.selectbox(
-                    "Pick an episode",
+                    "episode",
                     [p.name for p in md_files],
+                    label_visibility="collapsed",
+                    key="episode_picker",
                 )
             picked = EPISODES_DIR / choice
             with st.container(border=True):
-                st.markdown(picked.read_text())
+                # Center the transcript at a comfortable reading measure
+                st.markdown(
+                    '<div style="max-width:720px;margin:0 auto">'
+                    + picked.read_text()
+                    + '</div>',
+                    unsafe_allow_html=True,
+                )
