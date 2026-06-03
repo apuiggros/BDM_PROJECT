@@ -660,15 +660,17 @@ with tab_trusted:
                 HAS_ALT_T = False
 
             with st.container(border=True):
-                st.markdown("**Row counts per table** — log scale (a single huge table would otherwise flatten the rest)")
+                st.markdown("**Row counts per table**")
                 if HAS_ALT_T:
-                    chart = (alt.Chart(counts.sort_values("rows", ascending=False))
+                    sorted_counts = counts.sort_values("rows", ascending=False)
+                    chart = (alt.Chart(sorted_counts)
                              .mark_bar(color="#8C7CF8", cornerRadius=4)
                              .encode(
-                                 x=alt.X("table:N", sort="-y", title=None,
-                                         axis=alt.Axis(labelAngle=-30)),
-                                 y=alt.Y("rows:Q", scale=alt.Scale(type="log"), title=None),
-                             ))
+                                 y=alt.Y("table:N", sort="-x", title=None),
+                                 x=alt.X("rows:Q", title="rows"),
+                                 tooltip=["table", "rows"],
+                             )
+                             .properties(height=max(28 * len(sorted_counts), 200)))
                     st.altair_chart(chart, use_container_width=True)
                 else:
                     st.bar_chart(counts.set_index("table")["rows"])
