@@ -18,7 +18,8 @@ DAG Graph
         ├──> ingest_wikipedia_biographies
         ├──> ingest_news_api
         ├──> ingest_wikiquote
-        └──> ingest_philosophy_se
+        ├──> ingest_philosophy_se
+        └──> ingest_hackernews
                 │
                 └──> convert_raw_to_delta
                         │
@@ -129,6 +130,10 @@ def run_philosophy_se() -> None:
     _run_ingestion_script("philosophyse_ingest.py")
 
 
+def run_hackernews() -> None:
+    _run_ingestion_script("hackernews_ingest.py")
+
+
 def run_delta_conversion() -> None:
     _run_ingestion_script("metadata_to_delta.py")
 
@@ -201,6 +206,18 @@ with DAG(
         doc_md="Downloads top-voted philosophy Q&A pairs from the Philosophy Stack Exchange API.",
     )
 
+    ingest_hackernews = PythonOperator(
+        task_id="ingest_hackernews",
+        python_callable=run_hackernews,
+        doc_md=(
+            "Daily Hacker News snapshot via the Algolia API. Quoted-phrase "
+            "queries per figure (registry-driven); one daily JSON snapshot "
+            "per UTC day at s3://landing-zone/hackernews/raw_json/. No auth "
+            "(Reddit's gate proved unworkable in 2026; HN audience also has "
+            "higher signal-to-noise for our 9 figures)."
+        ),
+    )
+
     # ── Delta Lake Transformation (Runs after batch sources are captured) ────
     # NOTE: This task is a P1 deliverable. P2's Trusted Zone (see
     # bdm_p2_trusted_zone_dag.py) reads the raw JSON/text from the landing
@@ -233,6 +250,7 @@ with DAG(
         ingest_wikipedia,
         ingest_wikiquote,
         ingest_philosophy_se,
+        ingest_hackernews,
     ]
     [
         ingest_philosophers,
@@ -242,5 +260,6 @@ with DAG(
         ingest_wikipedia,
         ingest_wikiquote,
         ingest_philosophy_se,
+        ingest_hackernews,
     ] >> ingest_delta_lake >> pipeline_done
 

@@ -1,10 +1,31 @@
 # 🏛️ Historical Conversational AI — Data Lakehouse Pipeline
-### Big Data Management (BDM) — P1: Cold-Path Ingestion & Bronze Landing Zone
+### Big Data Management (BDM) — P1 (Landing Zone) + P2 (Trusted, Exploitation, Consumption)
+
+> **Project status — 2026-06-01 · P2 COMPLETE** &nbsp;·&nbsp; P1 graded **9.5/10** &nbsp;·&nbsp; P2 deadline 2026-06-09
+>
+> **All four zones plus the BI seam are wired end-to-end and running.** The whole stack stands up with a single `make up` (see [§ Deploy the stack](#-deploy-the-stack)).
+>
+> - **Landing** — MinIO. **8 batch sources** (Philosophers, Wikipedia, Wikiquote, Gutenberg, GNews, Stack Exchange, Podcast audio, **Hacker News Algolia** — new in P2) plus a **Kafka streaming topic**.
+> - **Trusted** — DuckDB `trusted.duckdb`. 12 cleaned tables. PySpark for the heavy reads; pure DuckDB+boto3 for the small ones (tool-justified by data volume).
+> - **Exploitation** — DuckDB star schema `exploit.duckdb` (`dim_figure` + **5 fact tables + 1 streaming view**) plus a Milvus `corpus_chunks` collection (**87,437 vectors**, HNSW/COSINE, sentence-transformers/all-MiniLM-L6-v2).
+> - **Consumption** — **(a)** Conversational podcast interview (Reasoner / Voice / Interviewer / Episode composer, Claude `claude-sonnet-4-6`); **(b)** **Streamlit BI dashboard** at `:8501` with figure cards, custom SQL, and a Milvus semantic-search playground.
+> - **Streaming** — live Kafka → Spark Structured Streaming → Parquet → DuckDB view, joined to `dim_figure` and surfaced on the dashboard.
+>
+> **Full technical report:** [`documents/P2_TECHNICAL_REPORT.pdf`](documents/P2_TECHNICAL_REPORT.pdf) (12 pages, 12 sections).
+>
+> **Note on the P1 Delta tables:** the `bronze_tables/` Delta Lake layer described later in this README is **deprecated** as of P2. All tabular state lives in DuckDB (trusted + exploitation); all vector state lives in Milvus. MongoDB was deliberately dropped — every tool is justified by a downstream consumer (see the report §9 design-decision register, esp. D1 and D13).
 
 ---
 
 ## 📋 Table of Contents
 
+**P2 (current)**
+0. [P2 Status & Zone Overview](#-p2-status--zone-overview)
+   - [Trusted Zone](#trusted-zone)
+   - [Exploitation Zone](#exploitation-zone)
+   - [Consumption Zone](#consumption-zone)
+
+**P1 (landing zone — still in production for cold-path ingestion)**
 1. [End Goal & Motivation](#-end-goal--motivation)
 2. [Architecture Overview](#-architecture-overview)
 3. [Infrastructure Deep Dive](#-infrastructure-deep-dive)
@@ -12,11 +33,91 @@
 5. [DAG Orchestration](#-dag-orchestration)
 6. [Data Organization in the Landing Zone](#-data-organization-in-the-landing-zone)
 7. [Project Structure](#-project-structure)
-8. [Requirements & Pre-requisites](#-requirements--pre-requisites)
-9. [Step-by-Step Setup Tutorial](#-step-by-step-setup-tutorial)
-10. [Running the Pipeline](#-running-the-pipeline)
+8. [Deploy the stack](#-deploy-the-stack) — prerequisites, build, run, daily ops
+9. [Running the Pipeline (detailed)](#-running-the-pipeline)
 11. [Testing Scripts Locally](#-testing-scripts-locally)
 12. [Key Engineering Decisions](#-key-engineering-decisions)
+
+---
+
+## 🚦 P2 Status & Zone Overview
+
+```
+   MinIO (landing)  ──►  DuckDB (trusted)  ──►  DuckDB star (exploit)  ──►  Consumption agents
+                            │                       │
+                            │                       └──►  Milvus (corpus_chunks, 384-d, HNSW/COSINE)
+                            │
+                            └──►  Spark job (chunker+embedder) writes Milvus
+```
+
+| Zone | Storage | Built by | Status |
+|---|---|---|---|
+| Landing | MinIO `landing-zone/` | `bdm_p1_cold_path_ingestion` (P1 DAG, daily) | ✅ Done (P1) |
+| Trusted | DuckDB `duckdb/trusted.duckdb` (11 tables) | `bdm_p2_trusted_zone_dag` | ✅ Done |
+| Exploitation (tabular) | DuckDB `duckdb/exploit.duckdb` (`dim_figure` + 6 facts: works/quotes/news/SE/HN/mentions) | `bdm_p2_exploitation_zone_dag` | ✅ Done |
+| Exploitation (vector) | Milvus `corpus_chunks` collection | Spark job inside the same DAG | ✅ Done |
+| Consumption | `consumption/agents/*.py` + Markdown episodes | Manual / on-demand for now | ✅ Done (batch) |
+| Streaming seam | Kafka → Spark Structured Streaming → parquet → `fact_mentions_1m` view | `ingestion/spark_stream_mentions_1m.py` + `exploitation/structured/fact_mentions_1m.py` | ✅ Done |
+| Dashboard (BI) | Streamlit on port 8501, all six zones tabbed | `streamlit_app/app.py` | ✅ Done |
+
+> **Full P2 walkthrough:** see `documents/P2_TECHNICAL_REPORT.pdf` (10 pages — architecture diagram, datasource usage matrix, full star schema, consumption sequence diagram, design-decision register).
+
+### Trusted Zone
+- **Code:** `cleaning/structured/` (6 SQL-based cleaners) + `cleaning/unstructured/` (3 byte-level cleaners).
+- **Output:** `duckdb/trusted.duckdb` — one cleaned table per source (e.g. `trusted_wiki_pages`, `trusted_works`, `trusted_quotes`, `trusted_news_articles`, `trusted_se_qa`, `trusted_philosophers`, `trusted_gutenberg_catalog`, `trusted_podcast_episodes`, plus image/text content tables).
+- **Contract:** typed columns, deduped on a stable natural key, `figure_slug` joined back to the registry where applicable.
+- **Schemas documented in:** `cleaning/SCHEMAS.md`.
+- **DAG:** `orchestration/bdm_p2_trusted_zone_dag.py`. On success, triggers the exploitation DAG via `TriggerDagRunOperator`.
+
+### Exploitation Zone
+- **Code:** `exploitation/structured/` — `dim_figure.py`, `fact_works.py`, `fact_quotes.py`, `fact_news_articles.py`, `fact_se_qa.py`, `fact_hn_stories.py`, `fact_mentions_1m.py`, `corpus_chunks.py`.
+- **Tabular output:** `duckdb/exploit.duckdb` — classic star schema with `dim_figure` (9 figures) at the center and six fact tables/views: `fact_works`, `fact_quotes`, `fact_news_articles`, `fact_se_qa`, `fact_hn_stories` (P2 addition — Hacker News discourse signal), and `fact_mentions_1m` (streaming view). Fact builds are serialized via `chain()` because DuckDB is a single-writer engine.
+- **Vector output:** Milvus `corpus_chunks` collection — 384-d `sentence-transformers/all-MiniLM-L6-v2` embeddings, HNSW index (`M=16`, `efConstruction=200`), COSINE metric, ~220-word chunks with 40-word overlap. **Built by a Spark job** (the only place we use Spark — justified by per-row chunking + embedding fan-out).
+- **DAG:** `orchestration/bdm_p2_exploitation_zone_dag.py`.
+
+### Consumption Zone
+- **Code:** `consumption/agents/`
+  - `reasoner.py` — RAG retrieval against Milvus + DuckDB joins; builds the identity card with `voice_descriptor()` derived from the curated Wikipedia summary (no fabricated columns).
+  - `voice.py` — character-as-themselves response generation.
+  - `interviewer.py` — adaptive follow-ups, history threading, content-safety curation.
+  - `episode.py` — composes the final Markdown episode under `consumption/episodes/`.
+- **LLM:** `consumption/llm.py` — provider-swappable `llm_fn`; default is Anthropic Claude (`claude-sonnet-4-6`).
+- **Status:** runs end-to-end for any of the 9 figures from a curated opener through ~10 turns. TTS / audio rendering is the next deferred milestone.
+
+### Hacker News Source (P2 addition)
+- **Why HN, not Reddit:** Reddit's unauthenticated search endpoint started returning browser-check HTML pages (HTTP 403) for all programmatic clients in 2026, and OAuth requires per-account "Responsible Builder Policy" gating that several team accounts couldn't pass. We pivoted to the HN Algolia API: open, no auth, no key, and — most importantly — HN's audience genuinely discusses the 9 figures with much higher signal-to-noise (the top "Immanuel Kant" result is a 242-point philosophy primer on ralphammer.com; the top Reddit result was a Spanish "chimichanga" food post).
+- **Ingester:** `ingestion/hackernews_ingest.py` — quoted-phrase search per figure (`q="Immanuel Kant"` etc.), `tags=story`, 25 hits each, daily snapshot to `s3://landing-zone/hackernews/raw_json/YYYY-MM-DD.json`. Registry-driven; no per-figure code paths.
+- **Trusted cleaner:** `cleaning/structured/hackernews.py` — pure DuckDB + boto3 (the tool-justification rule applies: ~169 rows per snapshot does not need a Spark JVM). Dedupes on `object_id`, derives `host` from `url` for the dashboard.
+- **Fact:** `fact_hn_stories` joins `dim_figure` on `figure_slug`. Live count: **169 stories, 8 figures, 105 distinct hosts, 18 years of HN history (2008→2026)**.
+- **Dashboard:** the HN panel in the Exploitation tab shows stories-per-figure, top hosts (New Yorker, Paris Review, Guardian, NYT, …), and top stories by points.
+
+### Streaming Seam (Hot Path)
+- **Producer:** `ingestion/stream_producer.py` — synthetic generator that emits `character-mentions` events to Kafka (`character_name`, `domain`, `message`, `sentiment_score`, `source`) on a randomized 1–5s cadence. Not backed by a real Reddit/Twitter API; it simulates social-media traffic for the streaming demo.
+- **Aggregator:** `ingestion/spark_stream_mentions_1m.py` — Spark Structured Streaming job, 1-minute tumbling windows keyed by `(character_name, domain)`, watermark 30s, writes parquet to `streaming/fact_mentions_1m/`.
+- **Exposure:** `exploitation/structured/fact_mentions_1m.py` registers a DuckDB VIEW in `exploit.duckdb` that reads the parquet on the fly and LEFT JOINs `dim_figure` on `name` to attach `figure_slug` (NULL on unmapped names = visible drift signal).
+- **Run locally:**
+  ```bash
+  # 1) start the producer in the airflow-scheduler container
+  docker compose exec -d airflow-scheduler python /opt/airflow/ingestion/stream_producer.py
+  # 2) start the Spark streaming job
+  docker compose exec -d airflow-scheduler spark-submit \
+      --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0 \
+      /opt/airflow/ingestion/spark_stream_mentions_1m.py
+  # 3) re-register the view so it sees the new files
+  docker compose exec airflow-scheduler python /opt/airflow/exploitation/structured/fact_mentions_1m.py
+  ```
+
+### Dashboard (BI seam)
+- **Code:** `streamlit_app/app.py` — single-page Streamlit app, port **8501**.
+- **Six tabs:** Landing (MinIO objects) · Trusted (DuckDB table row counts) · Exploitation (star-schema queries + custom SQL, including the HN discourse-signal panel: top hosts, stories-per-figure, top stories by points) · Streaming (live `fact_mentions_1m` window rows) · Milvus (`corpus_chunks` stats) · Episodes (rendered podcast Markdown).
+- **Source of truth:** reads `duckdb/trusted.duckdb` + `duckdb/exploit.duckdb` (read-only mounts) and `streaming/fact_mentions_1m/*.parquet` directly. Each tab degrades gracefully if its source isn't populated yet.
+- **Open:** `http://localhost:8501` once `docker compose up` is settled.
+
+---
+
+## P1 Reference Documentation
+
+Everything below documents the **P1 landing zone**, which is still the canonical cold-path ingestion layer feeding the Trusted Zone. The text is preserved as-delivered for P1; treat the Delta Lake / `bronze_tables/` references as historical — that layer is no longer wired into downstream consumers.
 
 ---
 
@@ -34,6 +135,7 @@ The challenge is that such an AI needs to answer a deceptively complex question:
 | **Community Q&A** | Modern philosophical debates, clarifications, and community Q&A | Philosophy Stack Exchange API |
 | **Conversational Dynamics** | How an interview or debate flows — tone, pacing, turn-taking | Podcast Audio (iTunes RSS) |
 | **Current Events Awareness** | Top trending daily news so the historical figure can "react" to the modern world | GNews API (Top Headlines) |
+| **Public Discourse Signal** | Where and how each figure is being discussed today (high-quality long-form posts) | Hacker News Algolia API (P2 addition) |
 
 This P1 deliverable focuses on **Phase 1**: Building and automating a fully containerized, self-healing Bronze Layer pipeline to **extract and store all this raw data at scale**, creating the foundation from which the future Trusted Zone (data cleansing) and Exploitation Zone (AI model training) can be built.
 
@@ -43,7 +145,7 @@ This P1 deliverable focuses on **Phase 1**: Building and automating a fully cont
 
 The pipeline follows a **Registry-Driven, Micro-Ingestion architecture** organized around a central `character_registry.py` — a single source of truth for all target entities. Every ingestion script reads from this registry, ensuring that adding a new historical figure to the pipeline only requires editing one file.
 
-The pipeline currently targets **9 historical figures** across three domains (philosophy, science, literature), ingesting data from **7 external sources** plus a Kafka-based streaming pipeline.
+The pipeline currently targets **9 historical figures** across three domains (philosophy, science, literature), ingesting data from **8 external sources** (P2 added Hacker News via the Algolia API) plus a Kafka-based streaming pipeline.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -489,12 +591,54 @@ P1/
 │   ├── wikiquote_ingest.py        # Wikiquote API → Quotes JSON → MinIO
 │   ├── philosophyse_ingest.py     # StackExchange → Q&A JSON → MinIO
 │   ├── news_ingest.py             # GNews API → Daily Headlines JSON → MinIO
+│   ├── hackernews_ingest.py       # P2 — HN Algolia API → Landing JSON → MinIO
+│   ├── spark_stream_mentions_1m.py # P2 — Spark Structured Streaming aggregator
 │   ├── stream_producer.py         # SIMULATED trends → Kafka
 │   ├── stream_consumer.py         # Kafka → MinIO (Hot Path)
 │   └── metadata_to_delta.py       # JSON → Delta Lake (Lakehouse conversion)
 │
 ├── orchestration/                 # Airflow DAG definitions
-│   └── bdm_p1_pipeline_dag.py     # Daily batch DAG (7 parallel tasks + delta conversion)
+│   ├── bdm_p1_pipeline_dag.py     # P1: Daily landing-zone ingestion DAG
+│   ├── bdm_p2_trusted_zone_dag.py # P2: Landing → Trusted (DuckDB) cleaners
+│   └── bdm_p2_exploitation_zone_dag.py  # P2: Trusted → Star + Milvus (Spark)
+│
+├── cleaning/                      # P2 Trusted Zone — landing → DuckDB
+│   ├── SCHEMAS.md
+│   ├── structured/                # SQL-based cleaners (one per JSON source)
+│   └── unstructured/              # Byte-level cleaners (texts, images, audio)
+│
+├── exploitation/                  # P2 Exploitation Zone — Trusted → star + vectors
+│   └── structured/
+│       ├── dim_figure.py
+│       ├── fact_works.py
+│       ├── fact_quotes.py
+│       ├── fact_news_articles.py
+│       ├── fact_se_qa.py
+│       ├── fact_hn_stories.py     # P2 — HN discourse signal fact
+│       ├── fact_mentions_1m.py    # Streaming view over parquet → exploit.duckdb
+│       └── corpus_chunks.py       # Spark job → Milvus
+│
+├── consumption/                   # P2 Consumption Zone — conversational podcast
+│   ├── agents/
+│   │   ├── reasoner.py            # RAG + identity card + voice_descriptor
+│   │   ├── voice.py
+│   │   ├── interviewer.py
+│   │   └── episode.py
+│   ├── llm.py                     # Provider-swappable Claude wrapper
+│   └── episodes/                  # Generated Markdown episodes (gitignored)
+│
+├── streamlit_app/                 # P2 BI seam — single-page lakehouse dashboard
+│   ├── app.py                     # 6 tabs: Landing/Trusted/Exploit/Stream/Milvus/Episodes
+│   └── requirements.txt
+│
+├── streaming/                     # Spark Structured Streaming output (gitignored)
+│   └── fact_mentions_1m/          # 1-min character-mention parquet windows
+│
+├── duckdb/                        # P2 DuckDB files (gitignored — regenerable)
+│   ├── trusted.duckdb
+│   └── exploit.duckdb
+│
+├── documents/                     # Design docs + P2 technical report (PDF)
 │
 └── landing_zone/                  # Host-side persistent data directory
     └── landing-zone/              # Mirrors the MinIO bucket structure
@@ -502,109 +646,100 @@ P1/
 
 ---
 
-## ⚙️ Requirements & Pre-requisites
+## 🚀 Deploy the stack
 
-### System Requirements
-- **Operating System:** Linux, macOS, or Windows (WSL2 recommended)
-- **Docker Engine:** >= 24.x with Docker Compose plugin (or `docker-compose` v2)
-- **Python:** 3.10 or higher (only needed for local testing outside Airflow)
-- **Disk Space:** ~5 GB recommended for Docker images and landing zone data
+The whole pipeline — Landing → Trusted → Exploitation → Consumption, plus the BI dashboard and Milvus — stands up from a clean clone with two commands. The `Makefile` wraps every common operation in a one-liner; you don't need anything on the host except **Docker** and **GNU make**.
 
-### API Keys Required
+### Prerequisites
 
-| Service | Key Variable | How to Get |
-|---|---|---|
-| GNews API | `NEWS_API_KEY` | Register at [gnews.io](https://gnews.io/) → Free tier gives 100 req/day |
+| Requirement | Notes |
+|---|---|
+| **Docker Engine ≥ 24** (with the `docker compose` v2 plugin) | Tested on Docker Desktop / Linux Docker. WSL2 works on Windows. |
+| **GNU make** | `make` on macOS/Linux; on Windows use WSL2 or run the equivalent commands by hand (see `Makefile`). |
+| **Memory** | **8 GB RAM minimum, 16 GB recommended.** Milvus standalone alone wants ~2 GB; the corpus_chunks embedding job needs another ~2 GB; Airflow, Streamlit, Postgres and Kafka share the rest. |
+| **Disk** | ~7 GB for the airflow-spark image + ~2 GB landing zone data + Milvus data once embeddings are built. |
+| **Ports** | `8080` (Airflow), `8085` (Kafka UI), `8501` (Streamlit), `9000`/`9001` (MinIO API/Console), `9092` (Kafka), `19530`/`9091` (Milvus). Make sure none are bound. |
+| **API keys (optional)** | `NEWS_API_KEY` (GNews, free 100 req/day) and `ANTHROPIC_API_KEY` (Claude). Without them the rest of the pipeline still runs — only the news ingester and the LLM-backed podcast generation degrade. |
 
-> The Philosophers API, Project Gutenberg/Gutendex, Wikipedia, Wikiquote, and Stack Exchange are completely **public and require no authentication**.
-
-### Python Dependencies (`requirements.txt`)
-```
-requests>=2.31.0             # HTTP client for all API calls
-pandas>=2.0.0                # Data analysis and manipulation
-boto3>=1.34.0                # AWS SDK — used to talk to MinIO (S3-compatible)
-python-dotenv>=1.0.0         # Loads .env into os.environ
-apache-airflow>=2.9.0        # Workflow orchestration
-deltalake>=0.17.0            # Delta Lake format support
-pyarrow>=15.0.0              # Parquet storage underpinning
-kafka-python-ng>=2.2.0       # Kafka client (Producer/Consumer)
-```
-
----
-
-## 🚀 Step-by-Step Setup Tutorial
-
-### Step 1: Clone the Repository
+### Step 1 — clone + configure
 ```bash
 git clone <your-repo-url>
 cd P1
+cp .env.example .env
+# edit .env: paste your NEWS_API_KEY and ANTHROPIC_API_KEY if you have them
 ```
 
-### Step 2: Create the `.env` File
-Create a file named `.env` in the root of the project. This is the only manual configuration step required:
+`.env.example` is the **single source of truth** for every env var the codebase reads — copy it, fill the two API keys, you're done. Everything else has sensible defaults.
 
-```ini
-# ─── MinIO Object Store ────────────────────────────────────────────────────
-# Use localhost:9000 for local testing; Airflow uses minio:9000 internally
-MINIO_ENDPOINT=localhost:9000
-MINIO_ACCESS_KEY=admin
-MINIO_SECRET_KEY=password
-MINIO_BUCKET=landing-zone
-
-# ─── Kafka ──────────────────────────────────────────────────────────────────
-KAFKA_BOOTSTRAP_SERVERS=localhost:9092
-
-# ─── External API Keys ─────────────────────────────────────────────────────
-NEWS_API_KEY=YOUR_GNEWS_API_KEY_HERE
-```
-
-> ⚠️ **Never commit this file to Git.** It is already listed in `.gitignore`.
-
-### Step 3: Launch the Full Stack
+### Step 2 — build + boot
 ```bash
-docker compose up -d
+make build   # one-time: build the custom airflow-spark image (~5 GB, ~5 min)
+make up      # start the 12-container stack
 ```
 
-This single command boots:
-- PostgreSQL (Airflow metadata DB)
-- MinIO (object store + auto-creates the `landing-zone` bucket)
-- Apache Airflow Webserver & Scheduler
-- Zookeeper, Kafka & Kafka UI (hot-path streaming)
+`make build` builds the `bdm/airflow-spark:2.9.0` image (Airflow 2.9 + Java 17 + PySpark + DuckDB + sentence-transformers + pymilvus + anthropic SDK + kafka-python). Subsequent `make up` calls reuse the cached image and take ~90 seconds to pass all health checks.
 
-> 🕐 **First boot takes ~60-90 seconds** for the Airflow Webserver to run `db migrate`, create the admin user, and pass its health check before the Scheduler starts.
-
-You can watch the health in real time with:
+Watch the boot:
 ```bash
-docker compose ps
+make ps     # show container status until everything is (healthy)
 ```
-All 8 services should show `healthy` or `exited (0)` (for `minio-init`, which finishes immediately after creating the bucket).
 
-### Step 4: Access the UIs
+Once everything is up, open the four UIs:
 
 | Service | URL | Credentials |
 |---|---|---|
-| Airflow Web UI | [http://localhost:8080](http://localhost:8080) | user: `admin` / pass: `admin` |
-| MinIO Console | [http://localhost:9001](http://localhost:9001) | user: `admin` / pass: `password` |
-| Kafka UI | [http://localhost:8085](http://localhost:8085) | (no auth required) |
+| **Streamlit dashboard** | http://localhost:8501 | — |
+| Airflow Web UI | http://localhost:8080 | `admin` / `admin` |
+| MinIO Console | http://localhost:9001 | `admin` / `password` |
+| Kafka UI | http://localhost:8085 | — |
 
----
+### Step 3 — run the pipeline
 
-## 🔄 Running the Pipeline
+The Trusted DAG auto-triggers the Exploitation DAG, so a single ingest + trusted run pulls everything through.
 
-### Via the Airflow UI (Automated)
-1. Open [http://localhost:8080](http://localhost:8080) and log in.
-2. Find the DAG `bdm_p1_cold_path_ingestion` in the list.
-3. **Unpause it** using the toggle on the left side.
-4. Click the **▶ Run** button (the play icon) to trigger a manual execution.
-5. Click on the DAG name → **Graph View** to see the tasks executing in parallel.
-
-Each task will turn **green** on success and **red** on failure. Click any task → **Log** tab to see the full real-time output from the ingestion script.
-
-### Via the Command Line (Manual, for testing)
-You can trigger a DAG run directly:
 ```bash
-docker exec airflow-scheduler airflow dags trigger bdm_p1_cold_path_ingestion
+# 1. cold-path ingestion (8 sources → MinIO landing zone)
+make ingest-p1
+
+# 2. Trusted zone (cleaning) — auto-triggers Exploitation when green
+make trusted
+
+# 3. (optional) start the streaming hot path
+make stream-up           # producer + Spark Structured Streaming
+# … later …
+make stream-down
+
+# 4. (optional, requires ANTHROPIC_API_KEY) generate one podcast episode
+make episode FIG=kant
 ```
+
+Verify each zone's data quality with the gates that the DAGs use:
+```bash
+make verify-trusted      # row counts + key constraints in trusted.duckdb
+make verify-exploit      # star-schema integrity in exploit.duckdb
+make verify-milvus       # corpus_chunks collection sanity
+```
+
+Open the **Streamlit dashboard** at http://localhost:8501 — every tab is populated as soon as its zone has run. Tabs degrade gracefully if their source isn't ready yet.
+
+### Step 4 — daily ops + teardown
+
+```bash
+make logs s=airflow-scheduler   # follow logs of any service
+make down                       # stop everything; data persists in volumes + ./duckdb/
+make clean                      # stop + wipe Milvus + Airflow DB + DuckDB files (NOT the landing zone)
+```
+
+The complete list of targets is in [`Makefile`](Makefile); `make help` prints it.
+
+### Portability notes
+
+| What's portable | What's host-coupled |
+|---|---|
+| Every script runs **inside the airflow-scheduler container** — host needs no Python, Spark, or Java. | The landing-zone MinIO data is bind-mounted from `./landing_zone/` on the host; the path is in `docker-compose.yml`. |
+| The build (`make build`) produces the same image on macOS, Linux, and Windows (WSL2). | The Streamlit container compiles `torch` + `sentence-transformers` on first boot — that takes ~5 min the first time, ~5 sec on subsequent restarts (pip cache). |
+| `.env` is the single config surface. Container-internal hostnames (`minio:9000`, `milvus:19530`, `kafka:29092`) are baked into `docker-compose.yml` and override the host-localhost defaults from `.env`. | The `bdm/airflow-spark:2.9.0` image is **not on Docker Hub** — it must be built locally with `make build`. |
+| The pipeline is **idempotent at every stage**: re-running any DAG, the streaming job, or the embedding job overwrites the previous output cleanly. | First-time HuggingFace model download (~80 MB for `all-MiniLM-L6-v2`) requires internet and gets cached in the container. |
 
 ---
 

@@ -18,6 +18,7 @@ DAG graph
         ├─> clean_wikiquote
         ├─> clean_news
         ├─> clean_stack_exchange
+        ├─> clean_hackernews
         ├─> clean_podcast_episodes
         ├─> clean_philosopher_images
         └─> clean_gutenberg_catalog ──> clean_gutenberg_texts
@@ -114,6 +115,7 @@ def clean_wikipedia():                _run_python("structured/wikipedia.py")
 def clean_wikiquote():                _run_python("structured/wikiquote.py")
 def clean_news():                     _run_python("structured/news.py")
 def clean_stack_exchange():           _run_python("structured/stack_exchange.py")
+def clean_hackernews():               _run_python("structured/hackernews.py")
 def clean_gutenberg_catalog():        _run_python("structured/gutenberg_catalog.py")
 def clean_gutenberg_texts():          _run_python("unstructured/gutenberg_texts.py")
 def clean_podcast_episodes():         _run_python("unstructured/podcast_episodes.py")
@@ -176,6 +178,14 @@ with DAG(
             task_id="clean_stack_exchange",
             python_callable=clean_stack_exchange,
             doc_md="Philosophy SE → trusted_se_questions + trusted_se_answers (HTML stripped).",
+        ),
+        PythonOperator(
+            task_id="clean_hackernews",
+            python_callable=clean_hackernews,
+            doc_md=(
+                "HN daily snapshots → trusted_hn_stories. Pure DuckDB + boto3 "
+                "(tiny volume), deduped on object_id, host derived from url."
+            ),
         ),
         PythonOperator(
             task_id="clean_podcast_episodes",

@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Design Spec — Historical Figures Observatory</title>
+<link rel="stylesheet" href="styles.css">
+<style>
+  .doc { max-width: 980px; margin: 0 auto; padding: 48px 32px 90px; }
+  .doc-head { display: flex; align-items: center; gap: 16px; margin-bottom: 18px; }
+  .doc h1.title { font-size: 32px; font-weight: 800; white-space: nowrap; line-height: 1.1; }
+  .doc .lede { font-size: 15px; color: var(--ink-2); max-width: 680px; line-height: 1.6; margin: 10px 0 0; }
+  .sec { margin-top: 46px; }
+  .sec > h2 { font-size: 20px; font-weight: 700; display: flex; align-items: center; gap: 12px; margin-bottom: 6px; }
+  .sec > h2 .n { font-family: var(--mono); font-size: 13px; color: var(--primary); background: var(--primary-soft); padding: 3px 10px; border-radius: 9px; font-weight: 500; }
+  .sec > .note { color: var(--ink-3); font-size: 13.5px; margin: 0 0 20px; }
+
+  /* palette */
+  .pal { display: grid; grid-template-columns: repeat(2,1fr); gap: 14px; }
+  .sw-row { display: flex; align-items: center; gap: 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 12px 14px; }
+  .sw-chip { width: 46px; height: 46px; border-radius: 12px; flex: none; border: 1px solid rgba(0,0,0,.05); }
+  .sw-row .role { font-family: 'Poppins'; font-weight: 600; font-size: 13.5px; color: var(--ink); }
+  .sw-row .hex { font-family: var(--mono); font-size: 12px; color: var(--ink-3); margin-top: 2px; }
+  .sw-row .use { font-size: 11.5px; color: var(--ink-2); margin-top: 3px; }
+
+  /* type */
+  .type-row { display: grid; grid-template-columns: 200px 1fr; gap: 20px; align-items: baseline; padding: 16px 0; border-bottom: 1px solid var(--border-2); }
+  .type-row .meta { font-family: var(--mono); font-size: 11.5px; color: var(--ink-3); line-height: 1.7; }
+  .type-row .meta b { color: var(--ink); font-family: 'Poppins'; }
+
+  /* code panel */
+  .code { background: #1B1B2E; border-radius: var(--r-md); overflow: hidden; border: 1px solid #2A2A45; }
+  .code .bar { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-bottom: 1px solid #2A2A45; }
+  .code .bar .dotw { width: 11px; height: 11px; border-radius: 50%; }
+  .code .bar .fn { margin-left: 8px; font-family: var(--mono); font-size: 12px; color: #8C8CB8; white-space: nowrap; }
+  .code pre { margin: 0; padding: 18px 20px; overflow: auto; max-height: 560px; }
+  .code code { font-family: var(--mono); font-size: 12px; line-height: 1.75; color: #D7D7F2; white-space: pre; }
+  .code .c { color: #6A6A8E; } .code .s { color: #B49BFF; } .code .p { color: #6FD3C0; } .code .v { color: #E0B26A; }
+
+  /* patterns */
+  .pat { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 20px 22px; margin-bottom: 16px; }
+  .pat h3 { font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 10px; }
+  .pat h3 .k { font-family: var(--mono); font-size: 11px; background: var(--mint); color: var(--mint-ink); padding: 3px 9px; border-radius: 8px; font-weight: 500; }
+  .pat p { font-size: 13.5px; line-height: 1.6; color: var(--ink-2); margin: 10px 0 0; }
+  .pat code.inl { font-family: var(--mono); font-size: 12px; background: var(--primary-soft); color: var(--primary); padding: 2px 7px; border-radius: 6px; }
+  .pat .bad { color: var(--c-coral); font-weight: 600; }
+  .pat .good { color: var(--good); font-weight: 600; }
+
+  .backlink { display: inline-flex; align-items: center; gap: 9px; margin-top: 10px; font-family: 'Poppins'; font-weight: 600; font-size: 13px; color: var(--primary); text-decoration: none; background: var(--primary-soft); padding: 10px 16px; border-radius: 12px; }
+  .callout { background: var(--peach); border-radius: 14px; padding: 14px 18px; font-size: 13px; color: #8a5a1e; line-height: 1.55; margin-top: 18px; }
+  .callout b { color: var(--peach-ink); }
+</style>
+</head>
+<body>
+<div class="doc">
+
+  <div class="doc-head">
+    <div class="brand"><div class="mark">◎</div></div>
+    <div>
+      <h1 class="title">Design Spec &amp; Handoff</h1>
+    </div>
+  </div>
+  <p class="lede">A "Dabang"-flavoured restyle for your Streamlit data-lakehouse dashboard — rounded white cards on a lavender canvas, a single purple primary, pastel metric tiles and muted charts. Everything below drops into <code style="font-family:var(--mono);font-size:13px">app.py</code> without leaving Streamlit. <a class="backlink" href="Exploitation Tab.html">↗ Open the Exploitation mockup</a></p>
+
+  <div class="callout">Note on the brief: you originally asked for a serif / navy / terracotta "academic observatory" look. This handoff follows your later instruction to <b>match the Dabang reference</b> instead — friendly geometric sans, purple accent, pastel tiles. The data, 6-zone structure and Streamlit-only constraint are untouched. Say the word if you want the serif direction back.</p>
+
+  <!-- 1. PALETTE -->
+  <section class="sec">
+    <h2><span class="n">01</span>Color palette</h2>
+    <p class="note">Seven roles. One saturated primary, four pastel tile tints (with matching saturated icon inks), neutral ink + canvas.</p>
+    <div class="pal">
+      <div class="sw-row"><div class="sw-chip" style="background:#6B5BF2"></div><div><div class="role">Primary / accent</div><div class="hex">#6B5BF2 → #8C7CF8 (gradient)</div><div class="use">Active nav pill, buttons, tab underline, links</div></div></div>
+      <div class="sw-row"><div class="sw-chip" style="background:#F4F5FB"></div><div><div class="role">Canvas</div><div class="hex">#F4F5FB</div><div class="use">App background behind all cards</div></div></div>
+      <div class="sw-row"><div class="sw-chip" style="background:#25253C"></div><div><div class="role">Ink (headings / body / muted)</div><div class="hex">#25253C · #5A5A75 · #9A9AB4</div><div class="use">Text hierarchy; #9A9AB4 also de-emphasised axes</div></div></div>
+      <div class="sw-row"><div class="sw-chip" style="background:#ECEDF6"></div><div><div class="role">Border / surface</div><div class="hex">#FFFFFF card · #ECEDF6 hairline</div><div class="use">Subtle 1px borders instead of heavy shadow</div></div></div>
+      <div class="sw-row"><div class="sw-chip" style="background:#EFEBFF"></div><div><div class="role">Tile · lilac</div><div class="hex">#EFEBFF / ink #8C7CF8</div><div class="use">Metric tile + icon chip (figures)</div></div></div>
+      <div class="sw-row"><div class="sw-chip" style="background:#E2F7EE"></div><div><div class="role">Tile · mint</div><div class="hex">#E2F7EE / ink #2DB489</div><div class="use">Metric tile (quotes) · LIVE badge</div></div></div>
+      <div class="sw-row"><div class="sw-chip" style="background:#FFF0DF"></div><div><div class="role">Tile · peach</div><div class="hex">#FFF0DF / ink #F09A47</div><div class="use">Metric tile (works) · HN points pill</div></div></div>
+      <div class="sw-row"><div class="sw-chip" style="background:#FFE4E8"></div><div><div class="role">Tile · pink</div><div class="hex">#FFE4E8 / ink #F2607A</div><div class="use">Metric tile (news + HN)</div></div></div>
+    </div>
+    <p class="note" style="margin-top:18px">Chart hues (muted, one per chart): blue <b style="font-family:var(--mono);color:#5A9BF6">#5A9BF6</b> · green <b style="font-family:var(--mono);color:#3FCF8E">#3FCF8E</b> · yellow <b style="font-family:var(--mono);color:#D9A431">#F4C44C</b> · purple <b style="font-family:var(--mono);color:#8C7CF8">#8C7CF8</b> · coral <b style="font-family:var(--mono);color:#F2728C">#F2728C</b> · teal <b style="font-family:var(--mono);color:#2FA8A8">#3FC2C2</b>.</p>
+  </section>
+
+  <!-- 2. TYPE -->
+  <section class="sec">
+    <h2><span class="n">02</span>Typography</h2>
+    <p class="note">Two families + a mono. Poppins for anything structural (headings, numbers, labels), Inter for reading copy, JetBrains Mono for the connection block, dates, SQL and metric deltas.</p>
+    <div class="type-row"><div class="meta"><b>Poppins</b><br>700 / 800<br>Display &amp; numbers</div><div style="font-family:'Poppins';font-weight:800;font-size:30px;color:var(--ink)">Exploitation — Star Schema</div></div>
+    <div class="type-row"><div class="meta"><b>Poppins</b><br>600<br>Card titles · 16px</div><div style="font-family:'Poppins';font-weight:600;font-size:16px;color:var(--ink)">Hacker News discourse</div></div>
+    <div class="type-row"><div class="meta"><b>Inter</b><br>400 / 500<br>Body · 13–14px / 1.55</div><div style="font-family:'Inter';font-size:13.5px;color:var(--ink-2);max-width:520px;line-height:1.55">Founder of the Academy in Athens; his dialogues on justice, forms and the soul anchor the whole Western canon.</div></div>
+    <div class="type-row"><div class="meta"><b>JetBrains Mono</b><br>400 / 500<br>Data · 11–12px</div><div style="font-family:var(--mono);font-size:12px;color:var(--ink-2)">c. 428 – 348 BCE&nbsp;&nbsp;·&nbsp;&nbsp;SELECT COUNT(*) FROM fact_quote</div></div>
+    <p class="note" style="margin-top:16px">Scale (px): 34 title · 24 page · 20 section · 16 card-title · 26 metric-number · 13.5 body · 11 small-caps links / labels.</p>
+  </section>
+
+  <!-- 3. CSS BLOCK -->
+  <section class="sec">
+    <h2><span class="n">03</span>CSS injection block</h2>
+    <p class="note">Paste once near the top of <code style="font-family:var(--mono);font-size:12.5px">app.py</code> via <code style="font-family:var(--mono);font-size:12.5px">st.markdown(CSS, unsafe_allow_html=True)</code>. Targets Streamlit's real DOM hooks — fonts import inside, so nothing else is needed.</p>
+    <div class="code">
+      <div class="bar"><span class="dotw" style="background:#F2607A"></span><span class="dotw" style="background:#F4C44C"></span><span class="dotw" style="background:#3FCF8E"></span><span class="fn">app.py — CSS = """ … """</span></div>
+<pre><code><span class="c">/* ---- fonts + tokens ---- */</span>
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+<span class="s">:root</span>{
+  --bg:#F4F5FB; --surface:#fff; --border:#ECEDF6;
+  --ink:#25253C; --ink2:#5A5A75; --ink3:#9A9AB4;
+  --primary:#6B5BF2; --primary2:#8C7CF8; --soft:#EFEBFF;
+}
+<span class="c">/* ---- canvas + base type ---- */</span>
+<span class="s">.stApp</span>{ background:var(--bg); }
+<span class="s">html, body, [class*="css"]</span>{ font-family:'Inter',sans-serif; color:var(--ink2); }
+<span class="s">h1,h2,h3,h4</span>{ font-family:'Poppins',sans-serif; color:var(--ink);
+  letter-spacing:-.01em; font-weight:700; }
+<span class="s">.block-container</span>{ padding-top:2rem; max-width:1380px; }
+
+<span class="c">/* ---- sidebar (white, rounded, connection block) ---- */</span>
+<span class="s">section[data-testid="stSidebar"]</span>{ background:var(--surface);
+  border-right:1px solid var(--border); }
+<span class="s">section[data-testid="stSidebar"] .stCode</span>{ <span class="c">/* connection block */</span>
+  background:#20203A; border-radius:14px; font-family:'JetBrains Mono'; }
+
+<span class="c">/* ---- tabs → underline nav, not pills ---- */</span>
+<span class="s">.stTabs [data-baseweb="tab-list"]</span>{ gap:28px; border-bottom:1.5px solid var(--border);
+  background:transparent; }
+<span class="s">.stTabs [data-baseweb="tab"]</span>{ height:auto; padding:0 2px 14px; background:transparent;
+  font-family:'Poppins'; font-weight:600; font-size:14px; color:var(--ink3); }
+<span class="s">.stTabs [aria-selected="true"]</span>{ color:var(--ink); }
+<span class="s">.stTabs [data-baseweb="tab-highlight"]</span>{ height:3px; border-radius:3px 3px 0 0;
+  background:linear-gradient(135deg,var(--primary),var(--primary2)); }
+<span class="s">.stTabs [data-baseweb="tab-border"]</span>{ display:none; }
+
+<span class="c">/* ---- bordered containers → soft cards ---- */</span>
+<span class="s">[data-testid="stVerticalBlockBorderWrapper"]</span>{ background:var(--surface);
+  border:1px solid var(--border); border-radius:20px;
+  box-shadow:0 4px 14px rgba(36,37,80,.04); }
+<span class="s">[data-testid="stVerticalBlockBorderWrapper"] > div</span>{ padding:6px; }
+
+<span class="c">/* ---- metrics (fallback if you keep st.metric) ---- */</span>
+<span class="s">[data-testid="stMetric"]</span>{ background:var(--soft); border-radius:16px; padding:18px; }
+<span class="s">[data-testid="stMetricValue"]</span>{ font-family:'Poppins'; font-weight:700; color:var(--ink); }
+<span class="s">[data-testid="stMetricDelta"]</span>{ color:#2DB489; }
+
+<span class="c">/* ---- custom HTML helpers (figure cards, pills, tiles) ---- */</span>
+<span class="s">.figure-card</span>{ background:var(--surface); border:1px solid var(--border);
+  border-radius:16px; padding:18px; }
+<span class="s">.figure-card:hover</span>{ box-shadow:0 10px 30px rgba(36,37,80,.06); }
+<span class="s">.portrait</span>{ width:60px;height:60px;border-radius:16px;display:grid;place-items:center;
+  font-family:'Poppins';font-weight:700;font-size:22px;color:#fff; }
+<span class="s">.chiplet</span>{ font-size:10.5px;font-weight:600;padding:3px 9px;border-radius:8px;
+  background:var(--soft);color:var(--primary2); }
+<span class="s">.fig-links a</span>{ font-family:'Poppins';font-weight:600;font-size:10px;
+  letter-spacing:.08em;text-transform:uppercase;color:var(--primary);text-decoration:none; }
+<span class="s">.metric-tile</span>{ border-radius:16px;padding:20px; }
+<span class="s">.metric-tile .num</span>{ font-family:'Poppins';font-weight:700;font-size:26px;color:var(--ink); }
+
+<span class="c">/* ---- buttons + inputs ---- */</span>
+<span class="s">.stButton > button</span>{ border-radius:12px; font-family:'Poppins'; font-weight:600;
+  border:1px solid var(--border); }
+<span class="s">.stButton > button[kind="primary"]</span>{ border:none;
+  background:linear-gradient(135deg,var(--primary),var(--primary2));
+  box-shadow:0 8px 18px rgba(107,91,242,.28); }
+<span class="s">.stTextArea textarea, .stTextInput input</span>{ border-radius:12px;
+  border:1px solid var(--border); font-family:'JetBrains Mono'; }
+
+<span class="c">/* ---- dataframe → clean grid ---- */</span>
+<span class="s">.stDataFrame</span>{ border:1px solid var(--border); border-radius:14px; overflow:hidden; }
+<span class="s">.stDataFrame thead th</span>{ background:#FAFAFE; font-family:'Poppins';
+  text-transform:uppercase; font-size:11px; letter-spacing:.05em; color:var(--ink3); }
+
+<span class="c">/* ---- charts: de-emphasise axes (Altair theme) ---- */</span>
+<span class="s">.stVegaLiteChart .role-axis line, .stVegaLiteChart .role-axis path</span>{
+  stroke:#E6E7F1; }</code></pre>
+    </div>
+    <p class="note" style="margin-top:14px">For full control of chart colour + axis weight, register a small Altair theme (<code style="font-family:var(--mono);font-size:12.5px">alt.themes.register</code>) and use <code style="font-family:var(--mono);font-size:12.5px">st.altair_chart</code> instead of <code style="font-family:var(--mono);font-size:12.5px">st.bar_chart</code> — pass one of the six muted hues per chart and set <code style="font-family:var(--mono);font-size:12.5px">domain/grid=False</code>.</p>
+  </section>
+
+  <!-- 4. WIREFRAME -->
+  <section class="sec">
+    <h2><span class="n">04</span>Annotated wireframe — Exploitation</h2>
+    <p class="note">The full "after" is the interactive mockup. Open it and hit <b>"Annotate primitives"</b> (top bar) to overlay the lettered callouts mapping every region to its Streamlit primitive.</p>
+    <div class="pat" style="margin-top:6px">
+      <p style="margin:0"><b style="font-family:'Poppins';color:var(--ink)">Top→bottom order:</b> &nbsp;<span class="good">A</span> tab nav (<code class="inl">st.tabs</code>) → <span class="good">B</span> 4 metric tiles (<code class="inl">st.columns(4)</code>) → <span class="good">C</span> 3×3 figure grid (<code class="inl">st.columns(3)</code> loop) → <span class="good">D</span> 2×2 chart grid → <span class="good">E</span> HN panel (<code class="inl">st.columns([1.3,1])</code>) → <span class="good">F</span> streaming line + custom SQL side-by-side.</p>
+    </div>
+    <a class="backlink" href="Exploitation Tab.html">↗ Open mockup &amp; toggle annotations</a>
+  </section>
+
+  <!-- 5. PATTERNS -->
+  <section class="sec">
+    <h2><span class="n">05</span>Streamlit code patterns</h2>
+    <p class="note">Five reusable moves. The rule of thumb: Streamlit primitive for the <i>data</i>, a thin HTML wrapper for the <i>chrome</i>.</p>
+
+    <div class="pat">
+      <h3><span class="k">pattern 1</span>Figure card = bordered container + HTML inner</h3>
+      <p>Loop <code class="inl">dim_figure</code> rows into <code class="inl">st.columns(3)</code>. In each cell use <code class="inl">with st.container(border=True):</code> then a single <code class="inl">st.markdown(card_html, unsafe_allow_html=True)</code> holding the <span class="bad">.portrait</span>, name, <span class="bad">.chiplet</span> tags, bio and small-caps links. <span class="good">Do</span> render the portrait as a tinted monogram div; <span class="bad">don't</span> use <code class="inl">st.metric</code> here.</p>
+    </div>
+
+    <div class="pat">
+      <h3><span class="k">pattern 2</span>Metric tile, not st.metric</h3>
+      <p>The pastel tile + icon chip is custom: <code class="inl">st.columns(4)</code>, each a <code class="inl">st.markdown</code> with <span class="bad">div.metric-tile.lilac/mint/peach/pink</span>. Keeps the big Poppins number, the green delta line and the saturated icon chip that plain <code class="inl">st.metric</code> can't produce.</p>
+    </div>
+
+    <div class="pat">
+      <h3><span class="k">pattern 3</span>Charts via Altair theme, one hue each</h3>
+      <p>Register a muted theme once, then <code class="inl">st.altair_chart(alt.Chart(df).mark_bar(color="#8C7CF8", cornerRadius=6)…, use_container_width=True)</code>. Hide the grid and lighten axes so whitespace carries the layout. One hue per chart — never a rainbow.</p>
+    </div>
+
+    <div class="pat">
+      <h3><span class="k">pattern 4</span>SQL console = text_area + button + dataframe</h3>
+      <p><code class="inl">q = st.text_area("", value=DEFAULT_SQL, height=150)</code> styled by <span class="bad">.stTextArea textarea</span> (dark, mono). <code class="inl">st.button("Run query", type="primary")</code> → <code class="inl">con.execute(q).df()</code> into <code class="inl">st.dataframe(..., use_container_width=True)</code>. Guard it read-only (reject anything but <code class="inl">SELECT</code>).</p>
+    </div>
+
+    <div class="pat">
+      <h3><span class="k">pattern 5</span>Connection block in the sidebar</h3>
+      <p>One <code class="inl">st.sidebar.code(conn_text, language="bash")</code> — the <span class="bad">section[data-testid="stSidebar"] .stCode</span> rule turns it into the fixed dark monospaced panel. Pair with a green status dot via a small <code class="inl">st.markdown</code> above it.</p>
+    </div>
+  </section>
+
+</div>
+</body>
+</html>
